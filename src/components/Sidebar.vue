@@ -1,0 +1,242 @@
+<script setup>
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { 
+  LayoutDashboard, 
+  CheckSquare, 
+  Users, 
+  CreditCard, 
+  Calendar, 
+  UserCheck, 
+  Archive, 
+  MessageSquare,
+  ChevronRight,
+  LogOut
+} from 'lucide-vue-next';
+
+const router = useRouter();
+const showLogout = ref(false);
+
+const handleLogout = () => {
+  localStorage.removeItem('isLoggedIn');
+  router.push('/login');
+};
+
+const menuItems = [
+  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { name: 'Tasks', path: '/tasks', icon: CheckSquare },
+  { name: 'Leads', path: '/leads', icon: Users },
+  { name: 'Payments', path: '/payments', icon: CreditCard },
+  { name: 'Today', path: '/today', icon: Calendar },
+  { name: 'Archive', path: '/archive', icon: Archive },
+  { name: 'Bot manager', path: '/bot-manager', icon: MessageSquare },
+];
+</script>
+
+<template>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon"></div>
+        <span>EduCRM</span>
+      </div>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <div class="menu-section">
+        <p class="section-title">MAIN MENU</p>
+        <router-link 
+          v-for="item in menuItems" 
+          :key="item.name" 
+          :to="item.path"
+          class="nav-item"
+          active-class="active"
+        >
+          <component :is="item.icon" :size="20" class="icon" />
+          <span class="name">{{ item.name }}</span>
+          <ChevronRight :size="16" class="arrow" />
+        </router-link>
+      </div>
+    </nav>
+    
+    <div class="sidebar-footer">
+      <div class="user-info" @click="showLogout = !showLogout" :class="{ 'active': showLogout }">
+        <img src="https://ui-avatars.com/api/?name=Admin&background=7366FF&color=fff" alt="User">
+        <div>
+          <p class="user-name">Admin User</p>
+          <p class="user-role">Super Admin</p>
+        </div>
+      </div>
+      
+      <div class="logout-menu" :class="{ 'show': showLogout }" @click="handleLogout">
+        <LogOut :size="18" class="logout-icon" />
+        <span>Logout</span>
+      </div>
+    </div>
+  </aside>
+</template>
+
+<style scoped>
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 100;
+}
+
+.sidebar-header {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--primary), var(--info));
+  border-radius: 8px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 1rem 0.75rem;
+  overflow-y: auto;
+}
+
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray);
+  padding: 1rem 0.75rem 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.25rem;
+  border-radius: 8px;
+  color: var(--dark);
+  transition: all 0.2s ease;
+}
+
+.nav-item:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.nav-item.active {
+  background: var(--primary);
+  color: var(--white);
+  box-shadow: 0 4px 12px rgba(115, 102, 255, 0.4);
+}
+
+.icon {
+  margin-right: 0.75rem;
+}
+
+.name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.arrow {
+  opacity: 0.3;
+}
+
+.nav-item:hover .arrow,
+.nav-item.active .arrow {
+  opacity: 0.7;
+}
+
+.sidebar-footer {
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  position: relative;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.user-info:hover, .user-info.active {
+  background: var(--primary-light);
+}
+
+.user-info img {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.user-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.user-role {
+  font-size: 0.75rem;
+  color: var(--gray);
+}
+
+.logout-menu {
+  position: absolute;
+  bottom: calc(100% - 0.5rem);
+  left: 1.5rem;
+  right: 1.5rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  box-shadow: 0 8px 25px 0 rgba(75, 70, 92, 0.15);
+  color: var(--danger);
+  font-weight: 600;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+}
+
+.logout-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.logout-menu:hover {
+  background: #fdf3f3;
+}
+
+.logout-icon {
+  stroke-width: 2.5px;
+}
+</style>
