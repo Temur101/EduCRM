@@ -37,13 +37,18 @@ const movingTaskId = ref(null);
 const loadData = async () => {
   isLoading.value = true;
   try {
-    const { data: boardsData, error: boardsErr } = await supabase.from('boards').select('*').order('created_at', { ascending: true });
+    const { data: boardsData, error: boardsErr } = await supabase
+      .from('boards')
+      .select('*')
+      .neq('title', 'Today task list')
+      .neq('title', 'Finished tasks')
+      .order('created_at', { ascending: true });
     if (boardsErr) throw boardsErr;
 
     const { data: tasksData, error: tasksErr } = await supabase.from('tasks').select('*');
     if (tasksErr) throw tasksErr;
 
-    boards.value = boardsData.map(b => ({
+    boards.value = (boardsData || []).map(b => ({
       id: b.id,
       title: b.title,
       color: b.color,
@@ -136,13 +141,6 @@ const moveToToday = async (currentBoardId, task) => {
         .single();
       if (createErr) throw createErr;
       todayBoard = newBoard;
-      
-      boards.value.push({
-        id: todayBoard.id,
-        title: todayBoard.title,
-        color: todayBoard.color,
-        tasks: []
-      });
     }
 
     const { error: updateErr } = await supabase
@@ -157,10 +155,7 @@ const moveToToday = async (currentBoardId, task) => {
       currentBoard.tasks = currentBoard.tasks.filter(t => t.id !== task.id);
     }
     
-    const targetBoard = boards.value.find(b => b.id === todayBoard.id);
-    if (targetBoard) {
-      targetBoard.tasks.push(task);
-    }
+    
   } catch (e) {
     console.error('Error moving task to today:', e);
   } finally {
@@ -313,6 +308,13 @@ const closeBoardModal = () => {
 
 const confirmAddBoard = async () => {
   if (!newBoard.title.trim() || isSubmittingBoard.value) return;
+  
+  const reservedTitles = ['Today task list', 'Finished tasks'];
+  if (reservedTitles.includes(newBoard.title.trim())) {
+    alert("This title is reserved for the Today page. Please use a different name.");
+    return;
+  }
+
   isSubmittingBoard.value = true;
   const newBoardData = {
     id: `board-${Date.now()}`,

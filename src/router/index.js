@@ -9,6 +9,12 @@ const routes = [
     meta: { layout: 'blank' }
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('../views/Register.vue'),
+    meta: { layout: 'blank' }
+  },
+  {
     path: '/',
     name: 'Dashboard',
     component: Dashboard,
@@ -33,10 +39,12 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+  const publicPages = ['Login', 'Register'];
+  const authRequired = !publicPages.includes(to.name);
 
-  if (to.name !== 'Login' && !isLoggedIn) {
+  if (authRequired && !isLoggedIn) {
     next({ name: 'Login' });
-  } else if (to.name === 'Login' && isLoggedIn) {
+  } else if (publicPages.includes(to.name) && isLoggedIn) {
     next({ name: 'Dashboard' });
   } else {
     next();

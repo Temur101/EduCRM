@@ -28,7 +28,10 @@ const deletingPaymentId = ref(null);
 const activeDropdown = ref(null);
 const searchQuery = ref('');
 const currentPage = ref(1);
-const itemsPerPage = 10;
+const itemsPerPage = 15;
+
+const startDate = ref('');
+const endDate = ref('');
 
 const toggleDropdown = (id, event) => {
   event.stopPropagation();
@@ -71,12 +74,26 @@ onMounted(() => {
 
 // --- Filter & Pagination Logic ---
 const filteredPayments = computed(() => {
-  if (!searchQuery.value) return payments.value;
-  const q = searchQuery.value.toLowerCase();
-  return payments.value.filter(p => 
-    p.student.toLowerCase().includes(q) || 
-    p.receiptId.toLowerCase().includes(q)
-  );
+  let result = payments.value;
+
+  // Search Filter
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase();
+    result = result.filter(p => 
+      p.student.toLowerCase().includes(q) || 
+      p.receiptId.toLowerCase().includes(q)
+    );
+  }
+
+  // Date Filter
+  if (startDate.value) {
+    result = result.filter(p => p.date >= startDate.value);
+  }
+  if (endDate.value) {
+    result = result.filter(p => p.date <= endDate.value);
+  }
+
+  return result;
 });
 
 const totalPages = computed(() => Math.ceil(filteredPayments.value.length / itemsPerPage));
@@ -302,7 +319,20 @@ const getMethodIcon = (method) => {
           />
         </div>
         <div class="table-actions">
-          <button class="btn-outline"><Filter :size="16" /> Filter</button>
+          <div class="date-filter-group">
+            <div class="date-input">
+              <Calendar :size="14" />
+              <input type="date" v-model="startDate" @change="currentPage = 1" placeholder="Start Date" />
+            </div>
+            <span class="date-separator">to</span>
+            <div class="date-input">
+              <Calendar :size="14" />
+              <input type="date" v-model="endDate" @change="currentPage = 1" placeholder="End Date" />
+            </div>
+            <button v-if="startDate || endDate" class="btn-clear-date" @click="startDate = ''; endDate = ''; currentPage = 1">
+              <X :size="14" />
+            </button>
+          </div>
           <button class="btn-outline"><Download :size="16" /> Export</button>
         </div>
       </div>
@@ -620,7 +650,63 @@ const getMethodIcon = (method) => {
 
 .table-actions {
   display: flex;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 1rem;
+}
+
+.date-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.35rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.date-input {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--light);
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  color: var(--gray);
+}
+
+.date-input input {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--dark);
+  font-family: inherit;
+  width: 105px;
+}
+
+.date-separator {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-transform: lowercase;
+}
+
+.btn-clear-date {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray);
+  background: var(--light);
+  transition: all 0.2s;
+}
+
+.btn-clear-date:hover {
+  background: #fff1f0;
+  color: var(--danger);
 }
 
 .btn-outline {

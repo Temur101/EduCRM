@@ -1,37 +1,43 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
-import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-vue-next';
+import { Mail, Lock, Eye, EyeOff, UserPlus, User } from 'lucide-vue-next';
 import { supabase } from '../supabase.js';
 
 const router = useRouter();
 const showPassword = ref(false);
 const isLoading = ref(false);
-const loginError = ref('');
+const registerError = ref('');
 
 const formData = reactive({
   email: '',
-  password: ''
+  password: '',
+  displayName: ''
 });
 
-const handleLogin = async () => {
-  if (!formData.email || !formData.password) {
-    loginError.value = 'Please fill in all fields';
+const handleRegister = async () => {
+  if (!formData.email || !formData.password || !formData.displayName) {
+    registerError.value = 'Please fill in all fields';
     return;
   }
 
   isLoading.value = true;
-  loginError.value = '';
+  registerError.value = '';
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signUp({
       email: formData.email,
-      password: formData.password
+      password: formData.password,
+      options: {
+        data: {
+          display_name: formData.displayName
+        }
+      }
     });
 
     if (error) {
-      // Emergency bypass for development/network issues (522)
-      if (error.message === 'Failed to fetch' || error.status === 522) {
+       // Emergency bypass for development/network issues (522)
+       if (error.message === 'Failed to fetch' || error.status === 522) {
         console.warn('Network timeout, entering offline dev mode');
         localStorage.setItem('isLoggedIn', 'true');
         router.push('/');
@@ -40,12 +46,14 @@ const handleLogin = async () => {
       throw error;
     }
 
-    localStorage.setItem('isLoggedIn', 'true');
-    router.push('/');
+    if (data.user) {
+      localStorage.setItem('isLoggedIn', 'true');
+      router.push('/');
+    }
     
   } catch (err) {
-    console.error('Login Error:', err);
-    loginError.value = err.message || "Invalid email or password.";
+    console.error('Registration Error:', err);
+    registerError.value = err.message || "Could not complete registration.";
   } finally {
     isLoading.value = false;
   }
@@ -53,22 +61,36 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="login-page">
-    <div class="login-container">
-      <div class="login-card card">
-        <div class="login-header">
+  <div class="register-page">
+    <div class="register-container">
+      <div class="register-card card">
+        <div class="register-header">
           <div class="brand">
             <div class="logo-box">
               <span class="logo-icon">E</span>
             </div>
             <h1>EduCRM</h1>
           </div>
-          <p class="subtitle">Welcome back! Please enter your details.</p>
+          <p class="subtitle">Join us today! Create your free account.</p>
         </div>
 
-        <form @submit.prevent="handleLogin" class="login-form">
-          <div v-if="loginError" class="error-banner">
-            {{ loginError }}
+        <form @submit.prevent="handleRegister" class="register-form">
+          <div v-if="registerError" class="error-banner">
+            {{ registerError }}
+          </div>
+
+          <div class="form-group">
+            <label>Full Name</label>
+            <div class="input-wrapper">
+              <User :size="18" class="field-icon" />
+              <input 
+                v-model="formData.displayName" 
+                type="text" 
+                placeholder="John Doe" 
+                autofocus
+                required
+              />
+            </div>
           </div>
 
           <div class="form-group">
@@ -79,7 +101,6 @@ const handleLogin = async () => {
                 v-model="formData.email" 
                 type="email" 
                 placeholder="admin@example.com" 
-                autofocus
                 required
               />
             </div>
@@ -106,29 +127,20 @@ const handleLogin = async () => {
             </div>
           </div>
 
-          <div class="form-options">
-            <label class="checkbox-container">
-              <input type="checkbox" checked />
-              <span class="checkmark"></span>
-              Remember me
-            </label>
-            <a href="#" class="forgot-link">Forgot password?</a>
-          </div>
-
-          <button type="submit" class="btn-login" :disabled="isLoading">
+          <button type="submit" class="btn-register" :disabled="isLoading">
             <span v-if="!isLoading">
-               Sign In <LogIn :size="18" />
+               Create Account <UserPlus :size="18" />
             </span>
             <span v-else class="loader"></span>
           </button>
         </form>
 
-        <div class="login-footer">
-          <p>Don't have an account? <router-link to="/register">Sign Up</router-link></p>
+        <div class="register-footer">
+          <p>Already have an account? <router-link to="/login">Sign In</router-link></p>
         </div>
       </div>
 
-      <div class="login-decor">
+      <div class="register-decor">
         <div class="decor-circle circle-1"></div>
         <div class="decor-circle circle-2"></div>
       </div>
@@ -137,20 +149,20 @@ const handleLogin = async () => {
 </template>
 
 <style scoped>
-.login-page {
+.register-page {
   min-height: 100vh;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top left, #7366FF0F, transparent),
-              radial-gradient(circle at bottom right, #7366FF0F, transparent),
+  background: radial-gradient(circle at top left, #28C76F0F, transparent),
+              radial-gradient(circle at bottom right, #28C76F0F, transparent),
               #F8F7FA;
   position: relative;
   overflow: hidden;
 }
 
-.login-container {
+.register-container {
   width: 100%;
   max-width: 450px;
   padding: 2rem;
@@ -158,7 +170,7 @@ const handleLogin = async () => {
   z-index: 10;
 }
 
-.login-card {
+.register-card {
   background: white;
   padding: 3rem 2.5rem;
   border-radius: 24px;
@@ -166,7 +178,7 @@ const handleLogin = async () => {
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
-.login-header {
+.register-header {
   text-align: center;
   margin-bottom: 2.5rem;
 }
@@ -209,7 +221,7 @@ const handleLogin = async () => {
   font-size: 0.95rem;
 }
 
-.login-form {
+.register-form {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -289,85 +301,11 @@ const handleLogin = async () => {
   color: var(--primary);
 }
 
-.form-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.85rem;
-}
-
-.checkbox-container {
-  display: flex;
-  align-items: center;
-  position: relative;
-  padding-left: 1.75rem;
-  cursor: pointer;
-  color: var(--dark);
-  font-weight: 600;
-  user-select: none;
-}
-
-.checkbox-container input {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-  height: 0;
-  width: 0;
-}
-
-.checkmark {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 18px;
-  width: 18px;
-  background-color: var(--white);
-  border: 1.5px solid var(--border);
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.checkbox-container:hover input ~ .checkmark {
-  border-color: var(--primary);
-}
-
-.checkbox-container input:checked ~ .checkmark {
-  background-color: var(--primary);
-  border-color: var(--primary);
-}
-
-.checkmark:after {
-  content: "";
-  position: absolute;
-  display: none;
-  left: 5px;
-  top: 2px;
-  width: 4px;
-  height: 8px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
-.checkbox-container input:checked ~ .checkmark:after {
-  display: block;
-}
-
-.forgot-link {
-  color: var(--primary);
-  font-weight: 600;
-  transition: opacity 0.2s;
-}
-
-.forgot-link:hover {
-  opacity: 0.8;
-}
-
-.btn-login {
+.btn-register {
   width: 100%;
   padding: 1rem;
   border-radius: 14px;
-  background: var(--primary);
+  background: #28C76F;
   color: white;
   font-weight: 700;
   font-size: 1rem;
@@ -377,19 +315,20 @@ const handleLogin = async () => {
   gap: 0.75rem;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 8px 16px rgba(115, 102, 255, 0.3);
+  box-shadow: 0 8px 16px rgba(40, 199, 111, 0.3);
+  border: none;
 }
 
-.btn-login:hover {
+.btn-register:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 20px rgba(115, 102, 255, 0.4);
+  box-shadow: 0 12px 20px rgba(40, 199, 111, 0.4);
 }
 
-.btn-login:active {
+.btn-register:active {
   transform: translateY(0);
 }
 
-.btn-login:disabled {
+.btn-register:disabled {
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
@@ -408,15 +347,15 @@ const handleLogin = async () => {
   to { transform: rotate(360deg); }
 }
 
-.login-footer {
+.register-footer {
   text-align: center;
   margin-top: 2rem;
   font-size: 0.9rem;
   color: var(--gray);
 }
 
-.login-footer a {
-  color: var(--primary);
+.register-footer a {
+  color: #28C76F;
   font-weight: 700;
   text-decoration: none;
 }
@@ -432,7 +371,7 @@ const handleLogin = async () => {
 .circle-1 {
   width: 400px;
   height: 400px;
-  background: rgba(115, 102, 255, 0.08);
+  background: rgba(40, 199, 111, 0.08);
   top: -100px;
   right: -100px;
 }
@@ -440,7 +379,7 @@ const handleLogin = async () => {
 .circle-2 {
   width: 300px;
   height: 300px;
-  background: rgba(115, 102, 255, 0.06);
+  background: rgba(40, 199, 111, 0.06);
   bottom: -50px;
   left: -50px;
 }

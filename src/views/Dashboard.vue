@@ -10,7 +10,8 @@ import {
   Target,
   Clock,
   Zap,
-  ChevronRight
+  ChevronRight,
+  DollarSign
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import { supabase } from '../supabase.js';
@@ -120,34 +121,49 @@ const getInits = (name) => {
 
     <!-- Stats Summary Row -->
     <div class="stats-grid">
-      <StatCard 
-        title="Total Active Leads" 
-        :value="leadsCount" 
-        :icon="Users" 
-        color="#7366FF"
-        :trend="12.5"
-      />
-      <StatCard 
-        title="Management Tasks" 
-        :value="tasksCount" 
-        :icon="CheckSquare" 
-        color="#FF9F43"
-        :trend="8.1"
-      />
-      <StatCard 
-        title="Total Revenue" 
-        :value="formatCurrency(paymentsTotal)" 
-        :icon="CreditCard" 
-        color="#28C76F"
-        :trend="15.2"
-      />
-      <StatCard 
-        title="Items in Today List" 
-        :value="todayTasksCount" 
-        :icon="Zap" 
-        color="#EA5455"
-        :trend="todayTasksCount > 0 ? 100 : 0"
-      />
+      <template v-if="isLoading">
+        <div v-for="i in 4" :key="i" class="card stat-card skeleton-card">
+          <div class="stat-header" style="margin-bottom: 1rem; display: flex; justify-content: space-between;">
+            <div class="skeleton" style="width: 40px; height: 40px; border-radius: 10px;"></div>
+            <div class="skeleton" style="width: 50px; height: 20px; border-radius: 6px;"></div>
+          </div>
+          <div class="stat-body">
+            <div class="skeleton" style="width: 60%; height: 14px; margin-bottom: 0.5rem;"></div>
+            <div class="skeleton" style="width: 40%; height: 24px; margin-bottom: 0.5rem;"></div>
+            <div class="skeleton" style="width: 30%; height: 12px;"></div>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <StatCard 
+          title="Total Active Leads" 
+          :value="leadsCount" 
+          :icon="Users" 
+          color="#7366FF"
+          :trend="12.5"
+        />
+        <StatCard 
+          title="Management Tasks" 
+          :value="tasksCount" 
+          :icon="CheckSquare" 
+          color="#FF9F43"
+          :trend="8.1"
+        />
+        <StatCard 
+          title="Total Revenue" 
+          :value="formatCurrency(paymentsTotal)" 
+          :icon="CreditCard" 
+          color="#28C76F"
+          :trend="15.2"
+        />
+        <StatCard 
+          title="Items in Today List" 
+          :value="todayTasksCount" 
+          :icon="Zap" 
+          color="#EA5455"
+          :trend="todayTasksCount > 0 ? 100 : 0"
+        />
+      </template>
     </div>
 
     <div class="dashboard-content-grid">
@@ -163,7 +179,14 @@ const getInits = (name) => {
           </div>
           <div class="leads-list">
             <div v-if="isLoading" class="skeleton-list">
-                <div v-for="i in 5" :key="i" class="skeleton-item"></div>
+                <div v-for="i in 5" :key="i" class="skeleton-item-row" style="display: flex; align-items: center; gap: 1rem; padding: 1rem;">
+                  <div class="skeleton" style="width: 44px; height: 44px; border-radius: 12px;"></div>
+                  <div style="flex: 1;">
+                    <div class="skeleton" style="width: 40%; height: 16px; margin-bottom: 0.5rem;"></div>
+                    <div class="skeleton" style="width: 25%; height: 12px;"></div>
+                  </div>
+                  <div class="skeleton" style="width: 60px; height: 24px; border-radius: 8px;"></div>
+                </div>
             </div>
             <template v-else>
                 <div v-for="lead in recentLeads" :key="lead.id" class="lead-item">
@@ -192,7 +215,14 @@ const getInits = (name) => {
             </div>
             <div class="payments-list">
                 <div v-if="isLoading" class="skeleton-list">
-                    <div v-for="i in 5" :key="i" class="skeleton-item"></div>
+                    <div v-for="i in 5" :key="i" class="skeleton-item-row" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem;">
+                      <div class="skeleton" style="width: 32px; height: 32px; border-radius: 8px;"></div>
+                      <div style="flex: 1;">
+                        <div class="skeleton" style="width: 50%; height: 14px; margin-bottom: 0.35rem;"></div>
+                        <div class="skeleton" style="width: 30%; height: 10px;"></div>
+                      </div>
+                      <div class="skeleton" style="width: 70px; height: 16px;"></div>
+                    </div>
                 </div>
                 <template v-else>
                     <div v-for="pay in recentPayments" :key="pay.id" class="payment-item">

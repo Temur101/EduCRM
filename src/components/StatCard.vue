@@ -3,7 +3,7 @@ defineProps({
   title: String,
   value: [String, Number],
   trend: Number,
-  icon: Object,
+  icon: [Object, Function, String],
   color: String,
   total: [String, Number]
 })
