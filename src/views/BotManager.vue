@@ -14,6 +14,7 @@ import {
   Plus
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { supabase } from '../supabase.js';
 
 const isEditing = ref(false);
@@ -39,7 +40,7 @@ const saveConfig = () => {
 
 const copyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl.value);
-    alert('Webhook URL copied!');
+    alert(useI18n().t('bot.webhookCopied'));
 };
 
 // Mock data for group members
@@ -55,13 +56,13 @@ const groupMembers = [
   <div class="bot-manager-page">
     <div class="page-header">
       <div class="header-left">
-        <h1 class="page-title">Bot Manager</h1>
-        <p class="breadcrumb">Automation / Telegram Assistant</p>
+        <h1 class="page-title">{{ $t('bot.title') }}</h1>
+        <p class="breadcrumb">{{ $t('bot.breadcrumb') }}</p>
       </div>
       <div class="header-right">
         <div class="status-badge" :class="connectionStatus">
           <div class="pulse-dot"></div>
-          {{ connectionStatus === 'active' ? 'System Running' : 'Connection Error' }}
+          {{ connectionStatus === 'active' ? $t('bot.systemRunning') : $t('bot.connectionError') }}
         </div>
       </div>
     </div>
@@ -76,25 +77,25 @@ const groupMembers = [
                 <Bot :size="32" />
               </div>
               <div class="bot-meta">
-                <h3>EduCRM Assistant Bot</h3>
-                <span class="platform">TELEGRAM PLATFORM</span>
+                <h3>{{ $t('bot.botName') }}</h3>
+                <span class="platform">{{ $t('bot.platform') }}</span>
               </div>
             </div>
           </div>
 
           <div class="bot-controls">
             <div class="form-group">
-              <label>Bot Token</label>
+              <label>{{ $t('bot.botToken') }}</label>
               <div class="token-input">
                 <input :type="isEditing ? 'text' : 'password'" v-model="botToken" :disabled="!isEditing" />
-                <button v-if="!isEditing" class="btn-edit" @click="toggleEdit"><Settings :size="16" /> Edit</button>
-                <button v-else class="btn-save" @click="saveConfig"><Save :size="16" /> Save</button>
+                <button v-if="!isEditing" class="btn-edit" @click="toggleEdit"><Settings :size="16" /> {{ $t('common.edit') }}</button>
+                <button v-else class="btn-save" @click="saveConfig"><Save :size="16" /> {{ $t('common.save') }}</button>
               </div>
-              <p class="help-text">Get your token from @BotFather on Telegram</p>
+              <p class="help-text">{{ $t('bot.helpText') }}</p>
             </div>
 
             <div class="form-group">
-                <label>Webhook Endpoint</label>
+                <label>{{ $t('bot.webhookEndpoint') }}</label>
                 <div class="webhook-display">
                     <code>{{ webhookUrl }}</code>
                     <button class="btn-copy" @click="copyWebhook"><Copy :size="16" /></button>
@@ -104,18 +105,18 @@ const groupMembers = [
         </div>
 
         <div class="card groups-card">
-            <h3>Connected Groups (1)</h3>
+            <h3>{{ $t('bot.connectedGroups', { count: 1 }) }}</h3>
             <div class="group-item active">
                 <div class="group-icon">
                     <Users :size="20" />
                 </div>
                 <div class="group-info">
-                    <p class="group-name">IT Academy Staff</p>
-                    <p class="group-members">16 Members • Listening for Attendance</p>
+                    <p class="group-name">{{ $t('bot.staffGroup') }}</p>
+                    <p class="group-members">{{ $t('bot.membersInfo', { count: 16 }) }}</p>
                 </div>
                 <button class="btn-icon"><Settings :size="16" /></button>
             </div>
-            <button class="btn-add-group"><Plus :size="18" /> Connect New Group</button>
+            <button class="btn-add-group"><Plus :size="18" /> {{ $t('bot.connectNewGroup') }}</button>
         </div>
       </div>
 
@@ -125,9 +126,9 @@ const groupMembers = [
           <div class="card-header">
             <div class="title-row">
                 <Terminal :size="20" class="icon" />
-                <h3>Live Webhook Logs</h3>
+                <h3>{{ $t('bot.liveLogs') }}</h3>
             </div>
-            <button class="btn-clear"><RefreshCcw :size="14" /> Refresh</button>
+            <button class="btn-clear"><RefreshCcw :size="14" /> {{ $t('bot.refresh') || 'Refresh' }}</button>
           </div>
           <div class="terminal-box">
              <div v-for="log in logs" :key="log.id" class="log-line" :class="log.type">
@@ -139,16 +140,16 @@ const groupMembers = [
         </div>
 
         <div class="card automation-rules">
-            <h3>Active Triggers</h3>
+            <h3>{{ $t('bot.activeTriggers') }}</h3>
             <div class="rule-item">
                 <div class="rule-header">
                     <CheckCircle2 :size="18" class="icon-success" />
-                    <h4>Attendance to Today List</h4>
+                    <h4>{{ $t('bot.attendanceRuleTitle') }}</h4>
                 </div>
-                <p>When a message follows the attendance reporting pattern, create a task in <strong>Today Schedule</strong> boards.</p>
+                <p>{{ $t('bot.attendanceRuleDesc') }}</p>
                 <div class="tag-row">
-                    <span class="rule-tag">Auto-Parse</span>
-                    <span class="rule-tag">Priority: High</span>
+                    <span class="rule-tag">{{ $t('bot.autoParse') }}</span>
+                    <span class="rule-tag">{{ $t('bot.priorityHigh') }}</span>
                 </div>
             </div>
         </div>

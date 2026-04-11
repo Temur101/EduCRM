@@ -58,7 +58,9 @@ const loadData = async () => {
       method: p.method,
       date: p.date,
       status: p.status,
-      receiptId: p.receipt_id
+      receiptId: p.receipt_id,
+      comment: p.comment,
+      month: p.month
     }));
   } catch (e) {
     console.error('Error loading payments:', e);
@@ -228,12 +230,12 @@ const getMethodIcon = (method) => {
     <!-- Header Area -->
     <div class="page-header">
       <div class="header-content">
-        <h1>Financial Overview</h1>
-        <p>Monitor and manage students payments history</p>
+        <h1>{{ $t('payments.title') }}</h1>
+        <p>{{ $t('payments.subtitle') }}</p>
       </div>
       <button class="btn-primary" @click="openModal">
         <Plus :size="20" /> 
-        Add New Payment
+        {{ $t('payments.addNew') }}
       </button>
     </div>
 
@@ -254,9 +256,9 @@ const getMethodIcon = (method) => {
             <DollarSign :size="24" />
           </div>
           <div class="stat-info">
-            <span class="stat-label">Total Revenue</span>
+            <span class="stat-label">{{ $t('payments.revenue') }}</span>
             <h2 class="stat-value">{{ formatCurrency(totalRevenue) }}</h2>
-            <span class="stat-trend positive">+12% from last month</span>
+            <span class="stat-trend positive">{{ $t('payments.trend') }}</span>
           </div>
         </template>
       </div>
@@ -276,9 +278,9 @@ const getMethodIcon = (method) => {
             <CheckCircle2 :size="24" />
           </div>
           <div class="stat-info">
-            <span class="stat-label">Successful Transactions</span>
+            <span class="stat-label">{{ $t('payments.success') }}</span>
             <h2 class="stat-value">{{ successCount }}</h2>
-            <span class="stat-subtext">Payments processed</span>
+            <span class="stat-subtext">{{ $t('payments.processed') }}</span>
           </div>
         </template>
       </div>
@@ -298,9 +300,9 @@ const getMethodIcon = (method) => {
             <Clock :size="24" />
           </div>
           <div class="stat-info">
-            <span class="stat-label">Pending Approval</span>
+            <span class="stat-label">{{ $t('payments.pending') }}</span>
             <h2 class="stat-value">{{ pendingCount }}</h2>
-            <span class="stat-subtext">Requires attention</span>
+            <span class="stat-subtext">{{ $t('payments.attention') }}</span>
           </div>
         </template>
       </div>
@@ -314,7 +316,7 @@ const getMethodIcon = (method) => {
           <input 
             type="text" 
             v-model="searchQuery" 
-            placeholder="Search by student or receipt..." 
+            :placeholder="$t('payments.searchPlaceholder')" 
             @input="currentPage = 1"
           />
         </div>
@@ -322,18 +324,18 @@ const getMethodIcon = (method) => {
           <div class="date-filter-group">
             <div class="date-input">
               <Calendar :size="14" />
-              <input type="date" v-model="startDate" @change="currentPage = 1" placeholder="Start Date" />
+              <input type="date" v-model="startDate" @change="currentPage = 1" :placeholder="$t('dashboard.startDate') || 'Start Date'" />
             </div>
             <span class="date-separator">to</span>
             <div class="date-input">
               <Calendar :size="14" />
-              <input type="date" v-model="endDate" @change="currentPage = 1" placeholder="End Date" />
+              <input type="date" v-model="endDate" @change="currentPage = 1" :placeholder="$t('dashboard.endDate') || 'End Date'" />
             </div>
             <button v-if="startDate || endDate" class="btn-clear-date" @click="startDate = ''; endDate = ''; currentPage = 1">
               <X :size="14" />
             </button>
           </div>
-          <button class="btn-outline"><Download :size="16" /> Export</button>
+          <button class="btn-outline"><Download :size="16" /> {{ $t('common.export') }}</button>
         </div>
       </div>
 
@@ -341,12 +343,14 @@ const getMethodIcon = (method) => {
         <table>
           <thead>
             <tr>
-              <th>Student Name</th>
-              <th>Receipt ID</th>
-              <th>Amount</th>
-              <th>Payment Method</th>
-              <th>Date</th>
-              <th>Status</th>
+               <th>{{ $t('payments.studentColumn') }}</th>
+              <th>{{ $t('payments.monthColumn') }}</th>
+              <th>{{ $t('payments.commentColumn') }}</th>
+              <th>{{ $t('payments.receiptColumn') }}</th>
+              <th>{{ $t('payments.amountColumn') }}</th>
+              <th>{{ $t('payments.methodColumn') }}</th>
+              <th>{{ $t('payments.dateColumn') }}</th>
+              <th>{{ $t('payments.statusColumn') }}</th>
               <th></th>
             </tr>
           </thead>
@@ -375,21 +379,23 @@ const getMethodIcon = (method) => {
             <!-- Real Data -->
             <template v-else>
               <tr v-for="item in paginatedPayments" :key="item.id">
-              <td>
+               <td>
                 <div class="student-info">
-                  <div class="avatar">{{ item.student.charAt(0) }}</div>
+                  <div class="avatar">{{ item.student?.charAt(0) || '?' }}</div>
                   <div class="details">
                     <span class="name">{{ item.student }}</span>
                     <span class="course">{{ item.course }}</span>
                   </div>
                 </div>
               </td>
+              <td class="table-month-cell"><span class="month-label">{{ item.month || '-' }}</span></td>
+              <td class="table-comment-cell">{{ item.comment || '-' }}</td>
               <td><code>{{ item.receiptId }}</code></td>
               <td><span class="amount">{{ formatCurrency(item.amount) }}</span></td>
               <td>
                 <div class="method-tag">
                   <span class="icon">{{ getMethodIcon(item.method) }}</span>
-                  {{ item.method }}
+                  {{ $t('payments.method' + item.method) }}
                 </div>
               </td>
               <td>{{ item.date }}</td>
@@ -407,7 +413,7 @@ const getMethodIcon = (method) => {
                     <button class="dropdown-item" @click="deletePayment(item.id)" :disabled="deletingPaymentId === item.id">
                       <Loader2 v-if="deletingPaymentId === item.id" :size="16" class="spin" />
                       <Trash2 v-else :size="16" /> 
-                      {{ deletingPaymentId === item.id ? 'Loading...' : 'Delete Payment' }}
+                      {{ deletingPaymentId === item.id ? $t('common.loading') : $t('leads.delete') }}
                     </button>
                   </div>
                 </div>
@@ -420,14 +426,14 @@ const getMethodIcon = (method) => {
 
       <div class="table-footer">
         <span>
-          Showing {{ paginatedPayments.length }} of {{ filteredPayments.length }} entries
+          {{ $t('payments.showing') }} {{ paginatedPayments.length }} {{ $t('payments.of') }} {{ filteredPayments.length }} {{ $t('payments.entries') }}
         </span>
         <div class="pagination" v-if="totalPages > 1">
           <button 
             :disabled="currentPage === 1" 
             @click="changePage(currentPage - 1)"
           >
-            Previous
+            {{ $t('payments.previous') }}
           </button>
           
           <button 
@@ -443,7 +449,7 @@ const getMethodIcon = (method) => {
             :disabled="currentPage === totalPages || totalPages === 0" 
             @click="changePage(currentPage + 1)"
           >
-            Next
+            {{ $t('payments.next') }}
           </button>
         </div>
       </div>
@@ -456,54 +462,54 @@ const getMethodIcon = (method) => {
           <div class="modal-header">
             <div class="modal-title-row">
               <div class="modal-icon"><CreditCard :size="22" /></div>
-              <h2>Add New Payment</h2>
+              <h2>{{ $t('payments.addModalTitle') }}</h2>
             </div>
             <button class="btn-icon" @click="closeModal"><X :size="20" /></button>
           </div>
 
           <div class="modal-body">
             <div class="form-group">
-              <label><User :size="14" /> Student Name <span class="required">*</span></label>
-              <input v-model="newPayment.student" placeholder="Select student..." />
+              <label><User :size="14" /> {{ $t('payments.studentName') }} <span class="required">*</span></label>
+              <input v-model="newPayment.student" :placeholder="$t('payments.studentPlaceholder')" />
             </div>
 
             <div class="form-group">
-              <label><FileText :size="14" /> Course / Purpose</label>
-              <input v-model="newPayment.course" placeholder="e.g. English B1 Monthly fee" />
+              <label><FileText :size="14" /> {{ $t('payments.courseLabel') }}</label>
+              <input v-model="newPayment.course" :placeholder="$t('payments.coursePlaceholder')" />
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label><DollarSign :size="14" /> Amount (UZS) <span class="required">*</span></label>
-                <input v-model="newPayment.amount" type="number" placeholder="Enter amount" />
+                <label><DollarSign :size="14" /> {{ $t('payments.amountLabel') }} <span class="required">*</span></label>
+                <input v-model="newPayment.amount" type="number" :placeholder="$t('payments.amountPlaceholder')" />
               </div>
               <div class="form-group">
-                <label><Wallet :size="14" /> Payment Method</label>
+                <label><Wallet :size="14" /> {{ $t('payments.methodLabel') }}</label>
                 <select v-model="newPayment.method">
-                  <option value="Cash">Cash</option>
-                  <option value="Card">Card</option>
-                  <option value="Click">Click</option>
-                  <option value="Payme">Payme</option>
-                  <option value="Transfer">Bank Transfer</option>
+                  <option value="Cash">{{ $t('payments.methodCash') }}</option>
+                  <option value="Card">{{ $t('payments.methodCard') }}</option>
+                  <option value="Click">{{ $t('payments.methodClick') }}</option>
+                  <option value="Payme">{{ $t('payments.methodPayme') }}</option>
+                  <option value="Transfer">{{ $t('payments.methodTransfer') }}</option>
                 </select>
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label><Calendar :size="14" /> Payment Date</label>
+                <label><Calendar :size="14" /> {{ $t('payments.dateLabel') }}</label>
                 <input v-model="newPayment.date" type="date" />
               </div>
             </div>
           </div>
 
           <div class="modal-footer">
-            <button class="btn-cancel-modal" @click="closeModal" :disabled="isSubmitting">Cancel</button>
+            <button class="btn-cancel-modal" @click="closeModal" :disabled="isSubmitting">{{ $t('common.cancel') }}</button>
             <button class="btn-confirm-payment" @click="addPayment" :disabled="!newPayment.student || !newPayment.amount || isSubmitting">
               <template v-if="isSubmitting">
-                <Loader2 :size="16" class="spin" /> Loading...
+                <Loader2 :size="16" class="spin" /> {{ $t('common.loading') }}
               </template>
-              <template v-else>Confirm Payment</template>
+              <template v-else>{{ $t('payments.confirmBtn') }}</template>
             </button>
           </div>
         </div>
@@ -831,6 +837,30 @@ td {
 
 .status-success { background: rgba(40,199,111,0.1); color: var(--success); }
 .status-pending { background: rgba(255,159,67,0.1); color: var(--warning); }
+
+.table-month-cell {
+  min-width: 120px;
+}
+
+.month-label {
+  background: #F0F4FF;
+  color: #5A67D8;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid #E0E7FF;
+}
+
+.table-comment-cell {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: #718096;
+  font-weight: 500;
+}
 
 .table-footer {
   padding: 1.5rem;

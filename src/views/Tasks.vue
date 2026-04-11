@@ -10,7 +10,9 @@ import {
   Trash2,
   Send,
   Loader2,
-  Zap
+  Zap,
+  Edit,
+  Save
 } from 'lucide-vue-next';
 import { ref, reactive, nextTick, onMounted, onUnmounted } from 'vue';
 import draggable from 'vuedraggable';
@@ -236,6 +238,56 @@ const openTaskDetails = (task) => {
 const closeTaskDetails = () => {
   showTaskDetailsModal.value = false;
   selectedTaskDetails.value = null;
+  isEditingDetails.value = false;
+};
+
+const isEditingDetails = ref(false);
+const editForm = reactive({
+  title: '',
+  description: '',
+  priority: '',
+  dueDate: ''
+});
+
+const startEditing = () => {
+  editForm.title = selectedTaskDetails.value.title;
+  editForm.description = selectedTaskDetails.value.description;
+  editForm.priority = selectedTaskDetails.value.priority;
+  editForm.dueDate = selectedTaskDetails.value.dueDate;
+  isEditingDetails.value = true;
+};
+
+const saveTaskChanges = async () => {
+  if (!editForm.title.trim()) return;
+  try {
+    const { error } = await supabase.from('tasks').update({
+      title: editForm.title,
+      description: editForm.description,
+      priority: editForm.priority,
+      due_date: editForm.dueDate
+    }).eq('id', selectedTaskDetails.value.id);
+    
+    if (error) throw error;
+    
+    selectedTaskDetails.value.title = editForm.title;
+    selectedTaskDetails.value.description = editForm.description;
+    selectedTaskDetails.value.priority = editForm.priority;
+    selectedTaskDetails.value.dueDate = editForm.dueDate;
+    
+    boards.value.forEach(b => {
+      const t = b.tasks.find(tk => tk.id === selectedTaskDetails.value.id);
+      if (t) {
+        t.title = editForm.title;
+        t.description = editForm.description;
+        t.priority = editForm.priority;
+        t.dueDate = editForm.dueDate;
+      }
+    });
+
+    isEditingDetails.value = false;
+  } catch (e) {
+    console.error(e);
+  }
 };
 
 const addComment = async () => {
@@ -357,20 +409,20 @@ const handleDragChange = async (event, boardId) => {
     <!-- Tasks Header Filters -->
     <div class="tasks-filters">
       <div class="priority-tabs">
-        <span class="label">Priority</span>
+        <span class="label">{{ $t('tasks.priority') }}</span>
         <button 
           v-for="p in priorityFilters" 
           :key="p"
           :class="['tab', { active: activePriority === p }]"
           @click="activePriority = p"
         >
-          {{ p }}
+          {{ $t('tasks.' + p.toLowerCase()) || p }}
         </button>
       </div>
 
       <div class="filter-actions">
         <button class="btn-add-board" @click="openBoardModal">
-          <Plus :size="18" /> Add Board
+          <Plus :size="18" /> {{ $t('tasks.addBoard') }}
         </button>
       </div>
     </div>
@@ -421,7 +473,7 @@ const handleDragChange = async (event, boardId) => {
                 </button>
                 <div v-if="activeDropdown === 'board-' + board.id" class="dropdown-menu">
                   <button class="dropdown-item" @click="deleteBoard(board.id)">
-                    <Trash2 :size="16" /> Delete Board
+                    <Trash2 :size="16" /> {{ $t('tasks.delete') }}
                   </button>
                 </div>
               </div>
@@ -443,7 +495,7 @@ const handleDragChange = async (event, boardId) => {
                       :style="{ backgroundColor: getPriorityColor(task.priority) }"
                     >
                       <span class="dot-small"></span>
-                      {{ task.priority }}
+                      {{ $t('tasks.' + task.priority.toLowerCase()) }}
                     </span>
                     <div class="dropdown-wrapper ml-auto">
                       <button class="btn-icon" @click="(e) => toggleDropdown('task-' + task.id, e)">
@@ -453,7 +505,7 @@ const handleDragChange = async (event, boardId) => {
                         <button class="dropdown-item" @click="deleteTask(board.id, task.id)" :disabled="deletingTaskId === task.id">
                           <Loader2 v-if="deletingTaskId === task.id" :size="16" class="spin" />
                           <Trash2 v-else :size="16" /> 
-                          {{ deletingTaskId === task.id ? 'Loading...' : 'Delete Task' }}
+                          {{ deletingTaskId === task.id ? $t('common.loading') : $t('tasks.delete') }}
                         </button>
                       </div>
                     </div>
@@ -462,7 +514,7 @@ const handleDragChange = async (event, boardId) => {
                   <h4 class="task-title">{{ task.title }}</h4>
 
                   <div class="due-on">
-                    <span class="label">Created:</span>
+                    <span class="label">{{ $t('tasks.dueDate') }}:</span>
                     <span class="date">{{ task.dueDate }}</span>
                   </div>
 
@@ -476,11 +528,11 @@ const handleDragChange = async (event, boardId) => {
                       class="btn-move-today ml-auto" 
                       @click="moveToToday(board.id, task)"
                       :disabled="movingTaskId === task.id"
-                      title="Move to Today"
+                      :title="$t('leads.moveToTodayTooltip')"
                     >
                       <Loader2 v-if="movingTaskId === task.id" :size="14" class="spin" />
                       <Zap v-else :size="14" /> 
-                      {{ movingTaskId === task.id ? 'Loading...' : 'Today' }}
+                      {{ movingTaskId === task.id ? $t('common.loading') : $t('tasks.moveToToday') }}
                     </button>
                   </div>
                 </div>
@@ -488,7 +540,7 @@ const handleDragChange = async (event, boardId) => {
             </draggable>
 
             <button class="btn-new-task" @click="openTaskModal(board.id)">
-              <Plus :size="18" /> New Task
+              <Plus :size="18" /> {{ $t('tasks.addTask') }}
             </button>
           </div>
 
@@ -496,7 +548,7 @@ const handleDragChange = async (event, boardId) => {
           <div class="kanban-column add-column-placeholder" @click="openBoardModal">
             <div class="placeholder-content">
               <Plus :size="32" />
-              <span>Add New Board</span>
+              <span>{{ $t('tasks.addBoard') }}</span>
             </div>
           </div>
         </template>
@@ -510,7 +562,7 @@ const handleDragChange = async (event, boardId) => {
           <div class="modal-header">
             <div class="modal-title-row">
               <div class="modal-icon task-icon"><CheckSquare :size="22" /></div>
-              <h2>Add New Task</h2>
+              <h2>{{ $t('tasks.addTask') }}</h2>
             </div>
             <button class="btn-icon" @click="closeTaskModal"><X :size="20" /></button>
           </div>
@@ -518,10 +570,10 @@ const handleDragChange = async (event, boardId) => {
           <div class="modal-body">
             <!-- Title -->
             <div class="form-group">
-              <label>Task Title <span class="required">*</span></label>
+              <label>{{ $t('tasks.taskTitle') }} <span class="required">*</span></label>
               <input
                 v-model="newTask.title"
-                placeholder="e.g. Design landing page..."
+                :placeholder="$t('tasks.taskTitlePlaceholder') || 'e.g. Design landing page...'"
                 @keyup.enter="confirmAddTask"
                 autofocus
               />
@@ -529,17 +581,17 @@ const handleDragChange = async (event, boardId) => {
 
             <!-- Description -->
             <div class="form-group">
-              <label>Description <span class="optional">(optional)</span></label>
+              <label>{{ $t('tasks.description') }} <span class="optional">({{ $t('leads.optional') }})</span></label>
               <textarea
                 v-model="newTask.description"
-                placeholder="What needs to be done?"
+                :placeholder="$t('tasks.descriptionPlaceholder') || 'What needs to be done?'"
                 rows="3"
               ></textarea>
             </div>
 
             <!-- Priority -->
             <div class="form-group">
-              <label>Priority</label>
+              <label>{{ $t('tasks.priority') }}</label>
               <div class="priority-selector">
                 <button
                   v-for="p in priorities"
@@ -549,7 +601,7 @@ const handleDragChange = async (event, boardId) => {
                   @click="newTask.priority = p"
                 >
                   <span class="pill-dot" :style="{ backgroundColor: newTask.priority === p ? 'white' : getPriorityColor(p) }"></span>
-                  {{ p }}
+                  {{ $t('tasks.' + p.toLowerCase()) }}
                 </button>
               </div>
             </div>
@@ -558,17 +610,17 @@ const handleDragChange = async (event, boardId) => {
           </div>
 
           <div class="modal-footer">
-            <button class="btn-cancel-modal" @click="closeTaskModal" :disabled="isSubmittingTask">Cancel</button>
+            <button class="btn-cancel-modal" @click="closeTaskModal" :disabled="isSubmittingTask">{{ $t('common.cancel') }}</button>
             <button
               class="btn-create-board"
               :disabled="!newTask.title.trim() || isSubmittingTask"
               @click="confirmAddTask"
             >
               <template v-if="isSubmittingTask">
-                <Loader2 :size="16" class="spin" /> Loading...
+                <Loader2 :size="16" class="spin" /> {{ $t('common.loading') }}
               </template>
               <template v-else>
-                <Plus :size="16" /> Add Task
+                <Plus :size="16" /> {{ $t('tasks.addTask') }}
               </template>
             </button>
           </div>
@@ -583,33 +635,33 @@ const handleDragChange = async (event, boardId) => {
           <div class="modal-header">
             <div class="modal-title-row">
               <div class="modal-icon"><Layout :size="22" /></div>
-              <h2>Create New Board</h2>
+              <h2>{{ $t('tasks.createBoardTitle') }}</h2>
             </div>
             <button class="btn-icon" @click="closeBoardModal"><X :size="20" /></button>
           </div>
 
           <div class="modal-body">
             <div class="form-group">
-              <label>Board Title <span class="required">*</span></label>
+              <label>{{ $t('tasks.boardTitle') }} <span class="required">*</span></label>
               <input
                 v-model="newBoard.title"
-                placeholder="e.g. Design Sprint, Marketing..."
+                :placeholder="$t('tasks.boardTitlePlaceholder') || 'e.g. Design Sprint, Marketing...'"
                 @keyup.enter="confirmAddBoard"
                 autofocus
               />
             </div>
 
             <div class="form-group">
-              <label>Description <span class="optional">(optional)</span></label>
+              <label>{{ $t('tasks.description') }} <span class="optional">({{ $t('leads.optional') }})</span></label>
               <textarea
                 v-model="newBoard.description"
-                placeholder="What is this board about?"
+                :placeholder="$t('tasks.boardDescriptionPlaceholder') || 'What is this board about?'"
                 rows="3"
               ></textarea>
             </div>
 
             <div class="form-group">
-              <label>Board Color</label>
+              <label>{{ $t('leads.stageColor') }}</label>
               <div class="color-swatches">
                 <button
                   v-for="color in boardColors"
@@ -626,13 +678,13 @@ const handleDragChange = async (event, boardId) => {
           </div>
 
           <div class="modal-footer">
-            <button class="btn-cancel-modal" @click="closeBoardModal" :disabled="isSubmittingBoard">Cancel</button>
+            <button class="btn-cancel-modal" @click="closeBoardModal" :disabled="isSubmittingBoard">{{ $t('common.cancel') }}</button>
             <button class="btn-create-board" @click="confirmAddBoard" :disabled="!newBoard.title.trim() || isSubmittingBoard">
               <template v-if="isSubmittingBoard">
-                <Loader2 :size="16" class="spin" /> Loading...
+                <Loader2 :size="16" class="spin" /> {{ $t('common.loading') }}
               </template>
               <template v-else>
-                <Plus :size="16" /> Create Board
+                <Plus :size="16" /> {{ $t('tasks.addBoard') }}
               </template>
             </button>
           </div>
@@ -648,26 +700,55 @@ const handleDragChange = async (event, boardId) => {
             <!-- Left Side: Task Info -->
             <div class="td-left">
               <div class="td-header">
-                <span class="tag tag-priority" :style="{ backgroundColor: getPriorityColor(selectedTaskDetails.priority) }">
-                  <span class="dot-small"></span> {{ selectedTaskDetails.priority }}
+                <span v-if="!isEditingDetails" class="tag tag-priority" :style="{ backgroundColor: getPriorityColor(selectedTaskDetails.priority) }">
+                  <span class="dot-small"></span> {{ $t('tasks.' + selectedTaskDetails.priority.toLowerCase()) }}
                 </span>
-                <button class="btn-icon td-close-mobile" @click="closeTaskDetails"><X :size="20" /></button>
+                <div v-else class="edit-priority-select">
+                   <select v-model="editForm.priority">
+                     <option v-for="p in priorities" :key="p" :value="p">{{ $t('tasks.' + p.toLowerCase()) }}</option>
+                   </select>
+                </div>
+
+                <div class="td-header-actions ml-auto">
+                   <button v-if="!isEditingDetails" class="btn-edit-task" @click="startEditing">
+                     <Edit :size="16" /> {{ $t('common.edit') }}
+                   </button>
+                   <button v-else class="btn-save-task" @click="saveTaskChanges">
+                     <Save :size="16" /> {{ $t('common.save') }}
+                   </button>
+                   <button class="btn-icon td-close-mobile" @click="closeTaskDetails"><X :size="20" /></button>
+                </div>
               </div>
               
-              <h2 class="td-title">{{ selectedTaskDetails.title }}</h2>
-              
-              <div class="td-desc">
-                <h3>Description</h3>
-                <p>{{ selectedTaskDetails.description || 'No description provided for this task.' }}</p>
+              <div class="td-info-body">
+                <template v-if="!isEditingDetails">
+                  <h2 class="td-title">{{ selectedTaskDetails.title }}</h2>
+                  
+                  <div class="td-desc">
+                    <h3>{{ $t('tasks.description') }}</h3>
+                    <p>{{ selectedTaskDetails.description || $t('tasks.noDescription') || 'No description provided.' }}</p>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="edit-group">
+                    <label>{{ $t('tasks.taskTitle') }}</label>
+                    <input v-model="editForm.title" class="edit-input-title" />
+                  </div>
+                  <div class="edit-group">
+                    <label>{{ $t('tasks.description') }}</label>
+                    <textarea v-model="editForm.description" rows="4" class="edit-textarea"></textarea>
+                  </div>
+                </template>
               </div>
               
               <div class="td-meta">
                 <div class="td-meta-item">
-                  <span class="label">Created</span>
-                  <span class="value">{{ selectedTaskDetails.dueDate }}</span>
+                  <span class="label">{{ $t('tasks.dueDate') }}</span>
+                  <span v-if="!isEditingDetails" class="value">{{ selectedTaskDetails.dueDate }}</span>
+                  <input v-else v-model="editForm.dueDate" class="edit-input-small" />
                 </div>
                 <div class="td-meta-item">
-                  <span class="label">Progress</span>
+                  <span class="label">{{ $t('tasks.progress') }}</span>
                   <div style="display: flex; gap: 0.5rem; align-items: center;">
                     <span class="value">{{ selectedTaskDetails.progress || 0 }}%</span>
                   </div>
@@ -678,13 +759,13 @@ const handleDragChange = async (event, boardId) => {
             <!-- Right Side: Comments -->
             <div class="td-right">
               <div class="td-right-header">
-                <h3>Comments</h3>
+                <h3>{{ $t('leads.comments') }}</h3>
                 <button class="btn-icon td-close-desktop" @click="closeTaskDetails"><X :size="20" /></button>
               </div>
               
               <div class="comments-list">
                 <div v-if="selectedTaskDetails.commentsList.length === 0" class="no-comments">
-                  No comments yet. Write the first one!
+                  {{ $t('leads.noComments') }}
                 </div>
                 <div v-for="comment in selectedTaskDetails.commentsList" :key="comment.id" class="comment-item">
                   <div class="comment-avatar">{{ comment.author.charAt(0) }}</div>
@@ -701,12 +782,12 @@ const handleDragChange = async (event, boardId) => {
               <div class="comment-input-area">
                 <textarea 
                   v-model="newComment" 
-                  placeholder="Type a comment..." 
+                  :placeholder="$t('leads.typeComment')" 
                   @keyup.enter.prevent="addComment"
                 ></textarea>
                 <div class="comment-actions">
                     <button class="btn-send-comment" :disabled="!newComment.trim()" @click="addComment">
-                      <Send :size="16" /> Send
+                      <Send :size="16" /> {{ $t('leads.send') }}
                     </button>
                 </div>
               </div>
@@ -1570,6 +1651,7 @@ const handleDragChange = async (event, boardId) => {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .btn-move-today:hover {
@@ -1577,6 +1659,112 @@ const handleDragChange = async (event, boardId) => {
   color: white;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(115, 102, 255, 0.2);
+}
+
+.btn-edit-task, .btn-save-task {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-edit-task {
+  background: var(--light);
+  color: var(--gray);
+}
+.btn-edit-task:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+.btn-save-task {
+  background: var(--primary);
+  color: white;
+}
+.btn-save-task:hover {
+  background: #6259e6;
+  box-shadow: 0 4px 12px rgba(115,102,255,0.3);
+}
+
+.edit-group {
+  margin-bottom: 2rem;
+}
+.edit-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+.edit-input-title {
+  width: 100%;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--dark);
+  border: none;
+  border-bottom: 2px solid var(--primary-light);
+  background: transparent;
+  outline: none;
+  padding: 0.5rem 0;
+  transition: all 0.2s;
+}
+.edit-input-title:focus {
+  border-bottom-color: var(--primary);
+}
+.edit-textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: white;
+  font-size: 1.05rem;
+  color: var(--dark);
+  line-height: 1.6;
+  outline: none;
+  resize: vertical;
+}
+.edit-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(115,102,255,0.1);
+}
+.edit-input-small {
+  padding: 0.4rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--dark);
+  width: 100%;
+  outline: none;
+}
+.edit-input-small:focus { border-color: var(--primary); }
+
+.edit-priority-select select {
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: white;
+  outline: none;
+}
+.edit-priority-select select:focus { border-color: var(--primary); }
+
+.td-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.td-info-body {
+  margin-top: 1.5rem;
+  margin-bottom: 2.5rem;
 }
 
 @media (max-width: 768px) {

@@ -22,7 +22,7 @@ defineProps({
     <div class="stat-body">
       <p class="stat-title">{{ title }}</p>
       <h2 class="stat-value">{{ value }}<span v-if="total" class="stat-total">/{{ total }}</span></h2>
-      <a href="#" class="view-all">View All</a>
+      <a href="#" class="view-all">{{ $t('dashboard.viewAll') }}</a>
     </div>
   </div>
 </template>

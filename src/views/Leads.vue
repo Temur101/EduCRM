@@ -8,12 +8,9 @@ import {
   Check,
   Layout,
   UserPlus,
-  Trash2,
-  Send,
-  BookOpen,
-  Globe,
-  Loader2,
-  Zap
+  Archive,
+  Edit,
+  Save
 } from 'lucide-vue-next';
 import { ref, reactive, nextTick, onMounted, onUnmounted } from 'vue';
 import draggable from 'vuedraggable';
@@ -156,9 +153,17 @@ const moveLeadToToday = async (lead) => {
     const dbTask = {
       id: `task-today-lead-${Date.now()}`,
       board_id: todayBoard.id,
-      title: `Lead Task: ${lead.name}`,
-      description: `Follow up with lead.\nPhone: ${lead.phone || 'N/A'}\n${lead.description || ''}`,
-      priority: 'High',
+      title: lead.name,
+      description: `[LEAD_DATA]${JSON.stringify({ 
+        initials: lead.initials, 
+        avatarColor: lead.avatarColor, 
+        phone: lead.phone, 
+        phone2: lead.phone2,
+        source: lead.source,
+        interest: lead.interest,
+        leadPriority: lead.priority
+      })}[/LEAD_DATA]\n${lead.description || ''}`,
+      priority: 'High', // Backend priority level
       due_date: creationDate,
       progress: 0,
       comments_list: []
@@ -241,6 +246,75 @@ const openLeadDetails = (lead) => {
 const closeLeadDetails = () => {
   showLeadDetailsModal.value = false;
   selectedLeadDetails.value = null;
+  isEditing.value = false;
+};
+
+const isEditing = ref(false);
+const editForm = reactive({
+  name: '',
+  description: '',
+  priority: '',
+  source: '',
+  interest: '',
+  phone: '',
+  phone2: ''
+});
+
+const startEditing = () => {
+  editForm.name = selectedLeadDetails.value.name;
+  editForm.description = selectedLeadDetails.value.description;
+  editForm.priority = selectedLeadDetails.value.priority;
+  editForm.source = selectedLeadDetails.value.source;
+  editForm.interest = selectedLeadDetails.value.interest;
+  editForm.phone = selectedLeadDetails.value.phone;
+  editForm.phone2 = selectedLeadDetails.value.phone2;
+  isEditing.value = true;
+};
+
+const saveLeadChanges = async () => {
+  if (!editForm.name.trim()) return;
+  try {
+    const { error } = await supabase.from('leads').update({
+      name: editForm.name,
+      description: editForm.description,
+      priority: editForm.priority,
+      source: editForm.source,
+      interest: editForm.interest,
+      phone: editForm.phone,
+      phone2: editForm.phone2
+    }).eq('id', selectedLeadDetails.value.id);
+    
+    if (error) throw error;
+    
+    selectedLeadDetails.value.name = editForm.name;
+    selectedLeadDetails.value.description = editForm.description;
+    selectedLeadDetails.value.priority = editForm.priority;
+    selectedLeadDetails.value.source = editForm.source;
+    selectedLeadDetails.value.interest = editForm.interest;
+    selectedLeadDetails.value.phone = editForm.phone;
+    selectedLeadDetails.value.phone2 = editForm.phone2;
+    selectedLeadDetails.value.initials = getInitials(editForm.name);
+    
+    boards.value.forEach(b => {
+      const l = b.leads.find(lead => lead.id === selectedLeadDetails.value.id);
+      if (l) {
+        Object.assign(l, {
+          name: editForm.name,
+          description: editForm.description,
+          priority: editForm.priority,
+          source: editForm.source,
+          interest: editForm.interest,
+          phone: editForm.phone,
+          phone2: editForm.phone2,
+          initials: getInitials(editForm.name)
+        });
+      }
+    });
+
+    isEditing.value = false;
+  } catch (e) {
+    console.error(e);
+  }
 };
 
 const addComment = async () => {
@@ -362,19 +436,19 @@ const handleDragChange = async (event, stageId) => {
     <!-- Header Filters -->
     <div class="leads-filters">
       <div class="priority-tabs">
-        <span class="label">Status</span>
+        <span class="label">{{ $t('leads.priority') }}</span>
         <button
           v-for="p in priorityFilters"
           :key="p"
           :class="['tab', { active: activePriority === p }]"
           @click="activePriority = p"
         >
-          {{ p }}
+          {{ $t('leads.' + p.toLowerCase()) }}
         </button>
       </div>
       <div class="filter-actions">
         <button class="btn-add-board" @click="openBoardModal">
-          <Plus :size="18" /> Add Stage
+          <Plus :size="18" /> {{ $t('leads.addStage') }}
         </button>
       </div>
     </div>
@@ -432,7 +506,7 @@ const handleDragChange = async (event, stageId) => {
                 </button>
                 <div v-if="activeDropdown === 'board-' + board.id" class="dropdown-menu">
                   <button class="dropdown-item" @click="deleteBoard(board.id)">
-                    <Trash2 :size="16" /> Delete Stage
+                    <Trash2 :size="16" /> {{ $t('leads.delete') }}
                   </button>
                 </div>
               </div>
@@ -460,7 +534,7 @@ const handleDragChange = async (event, stageId) => {
                         :style="{ backgroundColor: getPriorityColor(lead.priority) }"
                       >
                         <span class="dot-small"></span>
-                        {{ lead.priority }}
+                        {{ $t('leads.' + lead.priority.toLowerCase()) }}
                       </span>
                     </div>
                     <div class="dropdown-wrapper ml-auto">
@@ -471,7 +545,7 @@ const handleDragChange = async (event, stageId) => {
                         <button class="dropdown-item" @click="deleteLead(board.id, lead.id)" :disabled="deletingLeadId === lead.id">
                           <Loader2 v-if="deletingLeadId === lead.id" :size="16" class="spin" />
                           <Trash2 v-else :size="16" /> 
-                          {{ deletingLeadId === lead.id ? 'Loading...' : 'Delete Lead' }}
+                          {{ deletingLeadId === lead.id ? $t('common.loading') : $t('leads.delete') }}
                         </button>
                       </div>
                     </div>
@@ -515,11 +589,11 @@ const handleDragChange = async (event, stageId) => {
                       class="btn-move-today ml-auto" 
                       @click="moveLeadToToday(lead)"
                       :disabled="movingLeadId === lead.id"
-                      title="Move to Today"
+                      :title="$t('leads.moveToTodayTooltip')"
                     >
                       <Loader2 v-if="movingLeadId === lead.id" :size="14" class="spin" />
                       <Zap v-else :size="14" /> 
-                      {{ movingLeadId === lead.id ? 'Loading...' : 'Today' }}
+                      {{ movingLeadId === lead.id ? $t('common.loading') : $t('leads.moveToToday') }}
                     </button>
                   </div>
                 </div>
@@ -527,7 +601,7 @@ const handleDragChange = async (event, stageId) => {
             </draggable>
 
             <button class="btn-new-lead" @click="openLeadModal(board.id)">
-              <Plus :size="18" /> New Lead
+              <Plus :size="18" /> {{ $t('leads.newLeadBtn') }}
             </button>
           </div>
 
@@ -535,7 +609,7 @@ const handleDragChange = async (event, stageId) => {
           <div class="kanban-column add-column-placeholder" @click="openBoardModal">
             <div class="placeholder-content">
               <Plus :size="32" />
-              <span>Add New Stage</span>
+              <span>{{ $t('leads.addStagePlaceholder') }}</span>
             </div>
           </div>
         </template>
@@ -549,7 +623,7 @@ const handleDragChange = async (event, stageId) => {
           <div class="modal-header">
             <div class="modal-title-row">
               <div class="modal-icon lead-icon"><UserPlus :size="22" /></div>
-              <h2>Add New Lead</h2>
+              <h2>{{ $t('leads.newLeadModalTitle') || 'Add New Lead' }}</h2>
             </div>
             <button class="btn-icon" @click="closeLeadModal"><X :size="20" /></button>
           </div>
@@ -557,34 +631,34 @@ const handleDragChange = async (event, stageId) => {
           <div class="modal-body">
             <!-- Full Name (full width) -->
             <div class="form-group">
-              <label>Full Name <span class="required">*</span></label>
-              <input v-model="newLead.name" placeholder="e.g. John Smith" @keyup.enter="confirmAddLead" autofocus />
+              <label>{{ $t('leads.name') }} <span class="required">*</span></label>
+              <input v-model="newLead.name" :placeholder="$t('leads.namePlaceholder') || 'e.g. John Smith'" @keyup.enter="confirmAddLead" autofocus />
             </div>
 
             <!-- Phone 1 & Phone 2 -->
             <div class="form-row">
               <div class="form-group">
-                <label>Phone 1 <span class="required">*</span></label>
+                <label>{{ $t('leads.phone1') }} <span class="required">*</span></label>
                 <input v-model="newLead.phone" placeholder="+998 90 000 0000" />
               </div>
               <div class="form-group">
-                <label>Phone 2</label>
+                <label>{{ $t('leads.phone2') }}</label>
                 <input v-model="newLead.phone2" placeholder="+998 71 000 0000" />
               </div>
             </div>
 
             <!-- Lead Source (full width) -->
             <div class="form-group">
-              <label>Lead Source</label>
+              <label>{{ $t('leads.source') }}</label>
               <select v-model="newLead.source">
-                <option value="" disabled>Select source</option>
+                <option value="" disabled>{{ $t('leads.selectSource') }}</option>
                 <option v-for="s in sources" :key="s" :value="s">{{ s }}</option>
               </select>
             </div>
 
             <!-- Wants to Learn -->
             <div class="form-group">
-              <label>Wants to Learn</label>
+              <label>{{ $t('leads.wantsToLearn') }}</label>
               <div class="course-pills">
                 <button
                   v-for="course in courses"
@@ -600,7 +674,7 @@ const handleDragChange = async (event, stageId) => {
 
             <!-- Priority Selector -->
             <div class="form-group">
-              <label>Lead Priority</label>
+              <label>{{ $t('leads.leadPriority') }}</label>
               <div class="priority-selector">
                 <button
                   v-for="p in priorities"
@@ -611,34 +685,34 @@ const handleDragChange = async (event, stageId) => {
                   @click="newLead.priority = p"
                 >
                   <span class="pill-dot" :style="{ backgroundColor: newLead.priority === p ? 'white' : getPriorityColor(p) }"></span>
-                  {{ p }}
+                  {{ $t('leads.' + p.toLowerCase()) }}
                 </button>
               </div>
             </div>
 
             <!-- Description -->
             <div class="form-group">
-              <label>Notes / Description <span class="optional">(optional)</span></label>
+              <label>{{ $t('leads.description') }} <span class="optional">({{ $t('leads.optional') }})</span></label>
               <textarea
                 v-model="newLead.description"
-                placeholder="Add any extra notes about this lead..."
+                :placeholder="$t('leads.notesPlaceholder')"
                 rows="3"
               ></textarea>
             </div>
           </div>
 
           <div class="modal-footer">
-            <button class="btn-cancel-modal" @click="closeLeadModal" :disabled="isSubmitting">Cancel</button>
+            <button class="btn-cancel-modal" @click="closeLeadModal" :disabled="isSubmitting">{{ $t('common.cancel') }}</button>
             <button
               class="btn-create-lead"
               :disabled="!newLead.name.trim() || isSubmitting"
               @click="confirmAddLead"
             >
               <template v-if="isSubmitting">
-                <Loader2 :size="16" class="spin" /> Loading...
+                <Loader2 :size="16" class="spin" /> {{ $t('common.loading') }}
               </template>
               <template v-else>
-                <Plus :size="16" /> Add Lead
+                <Plus :size="16" /> {{ $t('leads.addLeadBtn') }}
               </template>
             </button>
           </div>
@@ -653,17 +727,17 @@ const handleDragChange = async (event, stageId) => {
           <div class="modal-header">
             <div class="modal-title-row">
               <div class="modal-icon"><Layout :size="22" /></div>
-              <h2>Create New Stage</h2>
+              <h2>{{ $t('leads.createStageModalTitle') || 'Create New Stage' }}</h2>
             </div>
             <button class="btn-icon" @click="closeBoardModal"><X :size="20" /></button>
           </div>
           <div class="modal-body">
             <div class="form-group">
-              <label>Stage Name <span class="required">*</span></label>
-              <input v-model="newBoard.title" placeholder="e.g. Proposal Sent, Negotiation..." @keyup.enter="confirmAddBoard" autofocus />
+              <label>{{ $t('leads.stageName') }} <span class="required">*</span></label>
+              <input v-model="newBoard.title" :placeholder="$t('leads.stageNamePlaceholder')" @keyup.enter="confirmAddBoard" autofocus />
             </div>
             <div class="form-group">
-              <label>Stage Color</label>
+              <label>{{ $t('leads.stageColor') }}</label>
               <div class="color-swatches">
                 <button
                   v-for="color in boardColors"
@@ -679,11 +753,11 @@ const handleDragChange = async (event, stageId) => {
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn-cancel-modal" @click="closeBoardModal" :disabled="isSubmittingStage">Cancel</button>
+            <button class="btn-cancel-modal" @click="closeBoardModal" :disabled="isSubmittingStage">{{ $t('common.cancel') }}</button>
             <button class="btn-create-lead" @click="confirmAddBoard" :disabled="!newBoard.title.trim() || isSubmittingStage">
-              <template v-if="isSubmittingStage">Creating...</template>
+              <template v-if="isSubmittingStage">{{ $t('leads.creating') }}</template>
               <template v-else>
-                <Plus :size="16" /> Create Stage
+                <Plus :size="16" /> {{ $t('leads.createStageBtn') }}
               </template>
             </button>
           </div>
@@ -699,31 +773,75 @@ const handleDragChange = async (event, stageId) => {
             <!-- Left Side: Lead Info -->
             <div class="td-left">
               <div class="td-header">
-                <span class="tag tag-source">{{ selectedLeadDetails.source }}</span>
-                <span v-if="selectedLeadDetails.interest" class="tag tag-interest">{{ selectedLeadDetails.interest }}</span>
-                <button class="btn-icon td-close-mobile" @click="closeLeadDetails"><X :size="20" /></button>
+                <div v-if="!isEditing" class="td-tags">
+                  <span class="tag tag-source">{{ selectedLeadDetails.source }}</span>
+                  <span v-if="selectedLeadDetails.interest" class="tag tag-interest">{{ selectedLeadDetails.interest }}</span>
+                </div>
+                <div v-else class="edit-tags-group">
+                   <select v-model="editForm.source" class="edit-select-small">
+                     <option v-for="s in sources" :key="s" :value="s">{{ s }}</option>
+                   </select>
+                   <select v-model="editForm.interest" class="edit-select-small">
+                     <option value="">{{ $t('leads.noInterest') || 'No course' }}</option>
+                     <option v-for="c in courses" :key="c.label" :value="c.label">{{ c.label }}</option>
+                   </select>
+                </div>
+
+                <div class="td-header-actions ml-auto">
+                   <button v-if="!isEditing" class="btn-edit-lead" @click="startEditing">
+                     <Edit :size="16" /> {{ $t('common.edit') }}
+                   </button>
+                   <button v-else class="btn-save-lead" @click="saveLeadChanges">
+                     <Save :size="16" /> {{ $t('common.save') }}
+                   </button>
+                   <button class="btn-icon td-close-mobile" @click="closeLeadDetails"><X :size="20" /></button>
+                </div>
               </div>
               
-              <div class="td-lead-profile">
+              <div class="td-lead-profile" v-if="!isEditing">
                 <div class="td-lead-avatar" :style="{ backgroundColor: selectedLeadDetails.avatarColor + '25', color: selectedLeadDetails.avatarColor }">
                   {{ selectedLeadDetails.initials }}
                 </div>
                 <h2 class="td-title">{{ selectedLeadDetails.name }}</h2>
               </div>
+              <div v-else class="edit-profile-group">
+                <label>{{ $t('leads.name') }}</label>
+                <input v-model="editForm.name" class="edit-input-title" />
+                
+                <div class="edit-priority-row">
+                  <label>{{ $t('leads.priority') }}</label>
+                  <div class="priority-selector">
+                    <button
+                      v-for="p in priorities"
+                      :key="p"
+                      type="button"
+                      :class="['priority-pill', { active: editForm.priority === p }]"
+                      :style="editForm.priority === p ? { background: getPriorityColor(p), color: 'white' } : {}"
+                      @click="editForm.priority = p"
+                    >
+                      <span class="pill-dot" :style="{ backgroundColor: editForm.priority === p ? 'white' : getPriorityColor(p) }"></span>
+                      {{ $t('leads.' + p.toLowerCase()) }}
+                    </button>
+                  </div>
+                </div>
+              </div>
               
               <div class="td-desc">
-                <h3>Notes / Description</h3>
-                <p>{{ selectedLeadDetails.description || 'No description provided for this lead.' }}</p>
+                <h3>{{ $t('leads.description') }}</h3>
+                <p v-if="!isEditing">{{ selectedLeadDetails.description || $t('leads.noDescription') }}</p>
+                <textarea v-else v-model="editForm.description" rows="4" class="edit-textarea"></textarea>
               </div>
               
               <div class="td-meta">
                 <div class="td-meta-item">
-                  <span class="label">Phone 1</span>
-                  <span class="value td-phone"><Phone :size="14"/> {{ selectedLeadDetails.phone || '-' }}</span>
+                  <span class="label">{{ $t('leads.phone1') }}</span>
+                  <span v-if="!isEditing" class="value td-phone"><Phone :size="14"/> {{ selectedLeadDetails.phone || '-' }}</span>
+                  <input v-else v-model="editForm.phone" class="edit-input-small" />
                 </div>
                 <div class="td-meta-item">
-                  <span class="label">Phone 2</span>
-                  <span class="value td-phone"><Phone :size="14"/> {{ selectedLeadDetails.phone2 || '-' }}</span>
+                  <span class="label">{{ $t('leads.phone2') }}</span>
+                  <span v-if="!isEditing" class="value td-phone"><Phone :size="14"/> {{ selectedLeadDetails.phone2 || '-' }}</span>
+                  <input v-else v-model="editForm.phone2" class="edit-input-small" />
                 </div>
               </div>
             </div>
@@ -731,13 +849,13 @@ const handleDragChange = async (event, stageId) => {
             <!-- Right Side: Comments -->
             <div class="td-right">
               <div class="td-right-header">
-                <h3>Comments</h3>
+                <h3>{{ $t('leads.comments') }}</h3>
                 <button class="btn-icon td-close-desktop" @click="closeLeadDetails"><X :size="20" /></button>
               </div>
               
               <div class="comments-list">
                 <div v-if="selectedLeadDetails.commentsList.length === 0" class="no-comments">
-                  No comments yet. Write the first one!
+                  {{ $t('leads.noComments') }}
                 </div>
                 <div v-for="comment in selectedLeadDetails.commentsList" :key="comment.id" class="comment-item">
                   <div class="comment-avatar">{{ comment.author.charAt(0) }}</div>
@@ -754,12 +872,12 @@ const handleDragChange = async (event, stageId) => {
               <div class="comment-input-area">
                 <textarea 
                   v-model="newComment" 
-                  placeholder="Type a comment..." 
+                  :placeholder="$t('leads.typeComment')" 
                   @keyup.enter.prevent="addComment"
                 ></textarea>
                 <div class="comment-actions">
                     <button class="btn-send-comment" :disabled="!newComment.trim()" @click="addComment">
-                      <Send :size="16" /> Send
+                      <Send :size="16" /> {{ $t('leads.send') }}
                     </button>
                 </div>
               </div>
@@ -1600,6 +1718,121 @@ const handleDragChange = async (event, stageId) => {
   border-radius: 0 12px 12px 12px;
   border: 1px solid var(--border);
   box-shadow: 0 4px 10px rgba(75,70,92,0.03);
+}
+
+.btn-edit-lead, .btn-save-lead {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-edit-lead {
+  background: var(--light);
+  color: var(--gray);
+}
+.btn-edit-lead:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+.btn-save-lead {
+  background: var(--primary);
+  color: white;
+}
+.btn-save-lead:hover {
+  background: #6259e6;
+  box-shadow: 0 4px 12px rgba(115,102,255,0.3);
+}
+
+.edit-tags-group {
+  display: flex;
+  gap: 0.75rem;
+}
+.edit-select-small {
+  padding: 0.4rem 0.75rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: white;
+  outline: none;
+}
+.edit-select-small:focus { border-color: var(--primary); }
+
+.edit-profile-group {
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.edit-profile-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+.edit-input-title {
+  width: 100%;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--dark);
+  border: none;
+  border-bottom: 2px solid var(--primary-light);
+  background: transparent;
+  outline: none;
+  padding: 0.5rem 0;
+}
+.edit-input-title:focus { border-bottom-color: var(--primary); }
+
+.edit-priority-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.edit-input-small {
+  width: 100%;
+  padding: 0.4rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--dark);
+  outline: none;
+}
+.edit-input-small:focus { border-color: var(--primary); }
+
+.edit-textarea {
+  width: 100%;
+  padding: 1.25rem;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: white;
+  font-size: 1rem;
+  color: var(--dark);
+  line-height: 1.6;
+  outline: none;
+  resize: vertical;
+}
+.edit-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(115,102,255,0.1); }
+
+.td-tags {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.td-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .comment-input-area {

@@ -1,9 +1,20 @@
 <script setup>
+import { ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import Sidebar from './components/Sidebar.vue';
 import Navbar from './components/Navbar.vue';
 
 const route = useRoute();
+const isSidebarOpen = ref(false);
+
+const toggleSidebar = () => {
+  isSidebarOpen.value = !isSidebarOpen.value;
+};
+
+// Close sidebar when navigating on mobile
+watch(() => route.path, () => {
+  isSidebarOpen.value = false;
+});
 </script>
 
 <template>
@@ -12,9 +23,17 @@ const route = useRoute();
   </div>
   
   <div v-else class="app-container">
-    <Sidebar />
+    <Sidebar :class="{ 'show': isSidebarOpen }" />
+    
+    <!-- Mobile Overlay -->
+    <div 
+      v-if="isSidebarOpen" 
+      class="mobile-overlay" 
+      @click="isSidebarOpen = false"
+    ></div>
+
     <main class="main-content">
-      <Navbar />
+      <Navbar @toggle-sidebar="toggleSidebar" />
       <div class="content-wrapper">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
@@ -67,6 +86,29 @@ const route = useRoute();
   display: flex;
   flex-direction: column;
   min-height: 100%;
+}
+
+@media (max-width: 991px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+.mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 90;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Scrollbar styling */

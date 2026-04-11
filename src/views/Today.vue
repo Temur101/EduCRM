@@ -10,7 +10,11 @@ import {
   Trash2,
   Send,
   Loader2,
-  Archive
+  Archive,
+  Zap,
+  Phone,
+  Globe,
+  BookOpen
 } from 'lucide-vue-next';
 import { ref, reactive, nextTick, onMounted, onUnmounted, computed } from 'vue';
 import draggable from 'vuedraggable';
@@ -84,15 +88,27 @@ const loadData = async () => {
       id: b.id,
       title: b.title,
       color: b.color,
-      tasks: (tasksData || []).filter(t => t.board_id === b.id).map(t => ({
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        priority: t.priority,
-        dueDate: t.due_date,
-        progress: t.progress,
-        commentsList: t.comments_list || []
-      }))
+      tasks: (tasksData || []).filter(t => t.board_id === b.id).map(t => {
+        let leadMetadata = null;
+        let finalDesc = t.description || '';
+        if (finalDesc.includes('[LEAD_DATA]')) {
+          const match = finalDesc.match(/\[LEAD_DATA\](.*?)\[\/LEAD_DATA\]/s);
+          if (match) {
+            try { leadMetadata = JSON.parse(match[1]); } catch(err) { console.error(err); }
+            finalDesc = finalDesc.replace(/\[LEAD_DATA\].*?\[\/LEAD_DATA\]\n?/s, '');
+          }
+        }
+        return {
+          id: t.id,
+          title: t.title,
+          description: finalDesc,
+          priority: t.priority,
+          dueDate: t.due_date,
+          progress: t.progress,
+          commentsList: t.comments_list || [],
+          leadMetadata
+        };
+      })
     }));
   } catch (e) {
     console.error('Error loading today data:', e);
@@ -159,6 +175,15 @@ const newTask = reactive({
 });
 const priorities = ['Low', 'Medium', 'High'];
 
+const getLeadPriorityColor = (p) => {
+  switch (p) {
+    case 'Hot': return '#EA5455';
+    case 'Warm': return '#FF9F43';
+    case 'Cold': return '#00CFE8';
+    default: return '#7366FF';
+  }
+};
+
 const getPriorityColor = (priority) => {
   switch (priority.toLowerCase()) {
     case 'high': return 'var(--danger)';
@@ -199,6 +224,63 @@ const openTaskDetails = (task) => {
 const closeTaskDetails = () => {
   showTaskDetailsModal.value = false;
   selectedTaskDetails.value = null;
+  isEditingDetails.value = false;
+};
+
+const isEditingDetails = ref(false);
+const editForm = reactive({
+  title: '',
+  description: '',
+  priority: '',
+  dueDate: ''
+});
+
+const startEditing = () => {
+  editForm.title = selectedTaskDetails.value.title;
+  editForm.description = selectedTaskDetails.value.description;
+  editForm.priority = selectedTaskDetails.value.priority;
+  editForm.dueDate = selectedTaskDetails.value.dueDate;
+  isEditingDetails.value = true;
+};
+
+const saveTaskChanges = async () => {
+  if (!editForm.title.trim()) return;
+  try {
+    // 1. Check if the task has lead metadata and re-attach it to description
+    const hasLeadMeta = selectedTaskDetails.value.leadMetadata;
+    let descToSave = editForm.description;
+    if (hasLeadMeta) {
+      descToSave = `[LEAD_DATA]${JSON.stringify(hasLeadMeta)}[/LEAD_DATA]\n${descToSave}`;
+    }
+
+    const { error } = await supabase.from('tasks').update({
+      title: editForm.title,
+      description: descToSave,
+      priority: editForm.priority,
+      due_date: editForm.dueDate
+    }).eq('id', selectedTaskDetails.value.id);
+    
+    if (error) throw error;
+    
+    selectedTaskDetails.value.title = editForm.title;
+    selectedTaskDetails.value.description = editForm.description;
+    selectedTaskDetails.value.priority = editForm.priority;
+    selectedTaskDetails.value.dueDate = editForm.dueDate;
+    
+    boards.value.forEach(b => {
+      const t = b.tasks.find(tk => tk.id === selectedTaskDetails.value.id);
+      if (t) {
+        t.title = editForm.title;
+        t.description = editForm.description;
+        t.priority = editForm.priority;
+        t.dueDate = editForm.dueDate;
+      }
+    });
+
+    isEditingDetails.value = false;
+  } catch (e) {
+    console.error(e);
+  }
 };
 
 const addComment = async () => {
@@ -274,17 +356,17 @@ const handleDragChange = async (event, boardId) => {
   <div class="tasks-page">
     <div class="tasks-filters">
       <div class="today-title">
-        <h2>Today's Schedule</h2>
+        <h2>{{ $t('today.schedule') }}</h2>
       </div>
       <div class="priority-tabs">
-        <span class="label">Priority</span>
+        <span class="label">{{ $t('tasks.priority') }}</span>
         <button 
           v-for="p in priorityFilters" 
           :key="p"
           :class="['tab', { active: activePriority === p }]"
           @click="activePriority = p"
         >
-          {{ p }}
+          {{ $t('tasks.' + p.toLowerCase()) || p }}
         </button>
       </div>
     </div>
@@ -313,7 +395,9 @@ const handleDragChange = async (event, boardId) => {
             <div class="board-header">
               <div class="header-main">
                 <span class="dot" :style="{ backgroundColor: board.color }"></span>
-                <h3 class="board-title">{{ board.title }}</h3>
+                <h3 class="board-title">
+                  {{ board.title === TODAY_BOARD_TITLE ? $t('tasks.todayTitle') : (board.title === FINISHED_BOARD_TITLE ? $t('tasks.finishedTitle') : board.title) }}
+                </h3>
                 <span class="count">{{ filteredCount(board.tasks).toString().padStart(2, '0') }}</span>
               </div>
             </div>
@@ -328,64 +412,114 @@ const handleDragChange = async (event, boardId) => {
             >
               <template #item="{ element: task }">
                 <div class="task-card card" v-show="activePriority === 'All' || task.priority === activePriority">
-                  <div class="card-labels">
-                    <span 
-                      class="tag tag-priority"
-                      :style="{ backgroundColor: getPriorityColor(task.priority) }"
-                    >
-                      <span class="dot-small"></span>
-                      {{ task.priority }}
-                    </span>
-                    <div class="dropdown-wrapper ml-auto">
-                      <button class="btn-icon" @click="(e) => toggleDropdown('task-' + task.id, e)">
-                        <MoreVertical :size="16" />
-                      </button>
-                      <div v-if="activeDropdown === 'task-' + task.id" class="dropdown-menu">
-                        <button class="dropdown-item" @click="deleteTask(board.id, task.id)" :disabled="deletingTaskId === task.id">
-                          <Loader2 v-if="deletingTaskId === task.id" :size="16" class="spin" />
-                          <Trash2 v-else :size="16" /> 
-                          {{ deletingTaskId === task.id ? 'Loading...' : 'Delete Task' }}
+                  <!-- Conditional Render: Lead card style -->
+                  <template v-if="task.leadMetadata">
+                    <div class="lead-top">
+                      <div class="lead-avatar" :style="{ backgroundColor: task.leadMetadata.avatarColor + '25', color: task.leadMetadata.avatarColor }">
+                        {{ task.leadMetadata.initials }}
+                      </div>
+                      <div class="lead-identity">
+                        <h4 class="lead-name">{{ task.title }}</h4>
+                        <span 
+                          class="tag tag-priority"
+                          :style="{ backgroundColor: getLeadPriorityColor(task.leadMetadata.leadPriority) }"
+                        >
+                          <span class="dot-small"></span>
+                          {{ $t('leads.' + task.leadMetadata.leadPriority.toLowerCase()) }}
+                        </span>
+                      </div>
+                      <div class="dropdown-wrapper ml-auto">
+                        <button class="btn-icon" @click="(e) => toggleDropdown('task-' + task.id, e)">
+                          <MoreVertical :size="16" />
                         </button>
+                        <transition name="dropdown">
+                          <div v-if="activeDropdown === 'task-' + task.id" class="dropdown-menu">
+                            <button class="dropdown-item danger" @click="deleteTask(board.id, task.id)" :disabled="deletingTaskId === task.id">
+                              <Loader2 v-if="deletingTaskId === task.id" :size="16" class="spin" />
+                              <Trash2 v-else :size="16" /> 
+                              {{ deletingTaskId === task.id ? $t('common.loading') : $t('tasks.delete') }}
+                            </button>
+                          </div>
+                        </transition>
                       </div>
                     </div>
-                  </div>
 
-                  <h4 class="task-title">{{ task.title }}</h4>
-
-                  <div class="due-on">
-                    <div class="due-row">
-                      <span class="label">Created:</span>
-                      <span class="date">{{ task.dueDate }}</span>
+                    <div class="lead-tags">
+                      <span v-if="task.leadMetadata.interest" class="tag tag-interest">
+                        <BookOpen :size="12" />
+                        {{ task.leadMetadata.interest }}
+                      </span>
+                      <span class="tag tag-source">
+                        <Globe :size="12" />
+                        {{ task.leadMetadata.source }}
+                      </span>
                     </div>
-                    <div v-if="task.description && task.description.includes('(Sent by:')" class="due-row sent-by">
-                      <span class="label">Sent by:</span>
-                      <span class="date">{{ task.description.split('(Sent by:')[1].replace(')', '').trim() }}</span>
-                    </div>
-                  </div>
 
-                  <div class="card-footer">
-                    <button class="meta-item btn-msg" @click="openTaskDetails(task)">
-                      <MessageSquare :size="16" /> {{ task.commentsList ? task.commentsList.length : task.comments }}
-                    </button>
-                    <button 
-                      class="btn-archive-small" 
-                      @click="deleteTask(board.id, task.id)"
-                      :disabled="deletingTaskId === task.id"
-                    >
-                      <template v-if="deletingTaskId === task.id">
-                        <Loader2 :size="14" class="spin" />
-                      </template>
-                      <template v-else>
-                        <Archive :size="14" /> Archive
-                      </template>
-                    </button>
-                  </div>
+                    <div class="lead-contacts">
+                      <div class="contact-row" v-if="task.leadMetadata.phone">
+                        <Phone :size="14" />
+                        <span>{{ task.leadMetadata.phone }}</span>
+                      </div>
+                      <div class="contact-row" v-if="task.leadMetadata.phone2">
+                        <Phone :size="14" />
+                        <span>{{ task.leadMetadata.phone2 }}</span>
+                      </div>
+                    </div>
+
+                    <div class="card-footer" style="margin-top: 1rem;">
+                      <button class="meta-item btn-msg" @click="openTaskDetails(task)">
+                        <MessageSquare :size="16" /> {{ task.commentsList ? task.commentsList.length : (task.comments || 0) }}
+                      </button>
+                    </div>
+                  </template>
+
+                  <!-- Standard task card style -->
+                  <template v-else>
+                    <div class="card-labels">
+                      <span 
+                        class="tag tag-priority"
+                        :style="{ backgroundColor: getPriorityColor(task.priority || 'Medium') }"
+                      >
+                        <span class="dot-small"></span>
+                        {{ $t('tasks.' + (task.priority || 'Medium').toLowerCase()) }}
+                      </span>
+                      <div class="dropdown-wrapper ml-auto">
+                        <button class="btn-icon" @click="(e) => toggleDropdown('task-' + task.id, e)">
+                          <MoreVertical :size="16" />
+                        </button>
+                        <transition name="dropdown">
+                          <div v-if="activeDropdown === 'task-' + task.id" class="dropdown-menu">
+                            <button class="dropdown-item danger" @click="deleteTask(board.id, task.id)" :disabled="deletingTaskId === task.id">
+                              <Loader2 v-if="deletingTaskId === task.id" :size="16" class="spin" />
+                              <Trash2 v-else :size="16" /> 
+                              {{ deletingTaskId === task.id ? $t('common.loading') : $t('tasks.delete') }}
+                            </button>
+                          </div>
+                        </transition>
+                      </div>
+                    </div>
+
+                    <h4 class="task-title">{{ task.title }}</h4>
+
+                    <div class="due-on">
+                      <div class="due-row">
+                        <span class="label">{{ $t('tasks.dueDate') }}:</span>
+                        <span class="date">{{ task.dueDate }}</span>
+                      </div>
+                    </div>
+
+                    <div class="card-footer">
+                      <button class="meta-item btn-msg" @click="openTaskDetails(task)">
+                        <MessageSquare :size="16" /> {{ task.commentsList ? task.commentsList.length : (task.comments || 0) }}
+                      </button>
+                    </div>
+                  </template>
                 </div>
               </template>
             </draggable>
 
             <button class="btn-new-task" @click="openTaskModal(board.id)">
-              <Plus :size="18" /> Add Today's Task
+              <Plus :size="18" /> {{ $t('today.addTodayTask') }}
             </button>
           </div>
         </template>
@@ -399,21 +533,21 @@ const handleDragChange = async (event, boardId) => {
           <div class="modal-header">
             <div class="modal-title-row">
               <div class="modal-icon task-icon"><CheckSquare :size="22" /></div>
-              <h2>New Today's Task</h2>
+              <h2>{{ $t('today.newTask') }}</h2>
             </div>
             <button class="btn-icon" @click="closeTaskModal"><X :size="20" /></button>
           </div>
           <div class="modal-body">
             <div class="form-group">
-              <label>Task Title <span class="required">*</span></label>
-              <input v-model="newTask.title" placeholder="What to do today?" @keyup.enter="confirmAddTask" autofocus />
+              <label>{{ $t('tasks.taskTitle') }} <span class="required">*</span></label>
+              <input v-model="newTask.title" :placeholder="$t('today.taskPlaceholder')" @keyup.enter="confirmAddTask" autofocus />
             </div>
             <div class="form-group">
-              <label>Description <span class="optional">(optional)</span></label>
-              <textarea v-model="newTask.description" placeholder="Notes for today..." rows="3"></textarea>
+              <label>{{ $t('tasks.description') }} <span class="optional">({{ $t('leads.optional') }})</span></label>
+              <textarea v-model="newTask.description" :placeholder="$t('today.notesPlaceholder')" rows="3"></textarea>
             </div>
             <div class="form-group">
-              <label>Priority</label>
+              <label>{{ $t('tasks.priority') }}</label>
               <div class="priority-selector">
                 <button
                   v-for="p in priorities"
@@ -423,19 +557,19 @@ const handleDragChange = async (event, boardId) => {
                   @click="newTask.priority = p"
                 >
                   <span class="pill-dot" :style="{ backgroundColor: newTask.priority === p ? 'white' : getPriorityColor(p) }"></span>
-                  {{ p }}
+                  {{ $t('tasks.' + p.toLowerCase()) }}
                 </button>
               </div>
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn-cancel-modal" @click="closeTaskModal" :disabled="isSubmittingTask">Cancel</button>
+            <button class="btn-cancel-modal" @click="closeTaskModal" :disabled="isSubmittingTask">{{ $t('common.cancel') }}</button>
             <button class="btn-create-board" :disabled="!newTask.title.trim() || isSubmittingTask" @click="confirmAddTask">
               <template v-if="isSubmittingTask">
-                <Loader2 :size="16" class="spin" /> Loading...
+                <Loader2 :size="16" class="spin" /> {{ $t('common.loading') }}
               </template>
               <template v-else>
-                <Plus :size="16" /> Add Task
+                <Plus :size="16" /> {{ $t('tasks.addTask') }}
               </template>
             </button>
           </div>
@@ -450,30 +584,75 @@ const handleDragChange = async (event, boardId) => {
           <div class="td-layout" v-if="selectedTaskDetails">
             <div class="td-left">
               <div class="td-header">
-                <span class="tag tag-priority" :style="{ backgroundColor: getPriorityColor(selectedTaskDetails.priority) }">
-                  <span class="dot-small"></span> {{ selectedTaskDetails.priority }}
+                <span v-if="!isEditingDetails" class="tag tag-priority" :style="{ backgroundColor: getPriorityColor(selectedTaskDetails.priority) }">
+                  <span class="dot-small"></span> {{ $t('tasks.' + selectedTaskDetails.priority.toLowerCase()) }}
                 </span>
-                <button class="btn-icon td-close-mobile" @click="closeTaskDetails"><X :size="20" /></button>
+                <div v-else class="edit-priority-select">
+                   <select v-model="editForm.priority">
+                     <option v-for="p in priorities" :key="p" :value="p">{{ $t('tasks.' + p.toLowerCase()) }}</option>
+                   </select>
+                </div>
+
+                <div class="td-header-actions ml-auto">
+                   <button v-if="!isEditingDetails" class="btn-edit-task" @click="startEditing">
+                     <Edit :size="16" /> {{ $t('common.edit') }}
+                   </button>
+                   <button v-else class="btn-save-task" @click="saveTaskChanges">
+                     <Save :size="16" /> {{ $t('common.save') }}
+                   </button>
+                   <button class="btn-icon td-close-mobile" @click="closeTaskDetails"><X :size="20" /></button>
+                </div>
               </div>
-              <h2 class="td-title">{{ selectedTaskDetails.title }}</h2>
-              <div class="td-desc">
-                <h3>Description</h3>
-                <p>{{ selectedTaskDetails.description || 'No description provided.' }}</p>
+
+               <div class="td-info-body">
+                <template v-if="!isEditingDetails">
+                  <!-- Lead identification header -->
+                  <div v-if="selectedTaskDetails.leadMetadata" class="td-lead-profile-mini">
+                    <div class="td-lead-avatar" :style="{ backgroundColor: selectedTaskDetails.leadMetadata.avatarColor + '25', color: selectedTaskDetails.leadMetadata.avatarColor }">
+                       {{ selectedTaskDetails.leadMetadata.initials }}
+                    </div>
+                    <div class="td-lead-info">
+                       <h2 class="td-title">{{ selectedTaskDetails.title }}</h2>
+                       <div class="td-lead-phones">
+                         <span v-if="selectedTaskDetails.leadMetadata.phone"><Phone :size="14" /> {{ selectedTaskDetails.leadMetadata.phone }}</span>
+                         <span v-if="selectedTaskDetails.leadMetadata.phone2"><Phone :size="14" /> {{ selectedTaskDetails.leadMetadata.phone2 }}</span>
+                       </div>
+                    </div>
+                  </div>
+                  <h2 v-else class="td-title">{{ selectedTaskDetails.title }}</h2>
+
+                  <div class="td-desc">
+                    <h3>{{ $t('tasks.description') }}</h3>
+                    <p>{{ selectedTaskDetails.description || $t('tasks.noDescription') }}</p>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="edit-group">
+                    <label>{{ $t('tasks.taskTitle') }}</label>
+                    <input v-model="editForm.title" class="edit-input-title" />
+                  </div>
+                  <div class="edit-group">
+                    <label>{{ $t('tasks.description') }}</label>
+                    <textarea v-model="editForm.description" rows="4" class="edit-textarea"></textarea>
+                  </div>
+                </template>
               </div>
+
               <div class="td-meta">
                 <div class="td-meta-item">
-                  <span class="label">Created</span>
-                  <span class="value">{{ selectedTaskDetails.dueDate }}</span>
+                  <span class="label">{{ $t('tasks.dueDate') }}</span>
+                  <span v-if="!isEditingDetails" class="value">{{ selectedTaskDetails.dueDate }}</span>
+                  <input v-else v-model="editForm.dueDate" class="edit-input-small" />
                 </div>
               </div>
             </div>
             <div class="td-right">
               <div class="td-right-header">
-                <h3>Comments</h3>
+                <h3>{{ $t('leads.comments') }}</h3>
                 <button class="btn-icon td-close-desktop" @click="closeTaskDetails"><X :size="20" /></button>
               </div>
               <div class="comments-list">
-                <div v-if="selectedTaskDetails.commentsList.length === 0" class="no-comments">No comments yet.</div>
+                <div v-if="selectedTaskDetails.commentsList.length === 0" class="no-comments">{{ $t('leads.noComments') }}</div>
                 <div v-for="comment in selectedTaskDetails.commentsList" :key="comment.id" class="comment-item">
                   <div class="comment-avatar">{{ comment.author.charAt(0) }}</div>
                   <div class="comment-content">
@@ -486,10 +665,10 @@ const handleDragChange = async (event, boardId) => {
                 </div>
               </div>
               <div class="comment-input-area">
-                <textarea v-model="newComment" placeholder="Type a comment..." @keyup.enter.prevent="addComment"></textarea>
+                <textarea v-model="newComment" :placeholder="$t('leads.typeComment')" @keyup.enter.prevent="addComment"></textarea>
                 <div class="comment-actions">
                     <button class="btn-send-comment" :disabled="!newComment.trim()" @click="addComment">
-                      <Send :size="16" /> Send
+                      <Send :size="16" /> {{ $t('leads.send') }}
                     </button>
                 </div>
               </div>
@@ -579,7 +758,6 @@ const handleDragChange = async (event, boardId) => {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  align-content: flex-start;
   gap: 0.75rem;
   padding-right: 8px;
 }
@@ -596,7 +774,7 @@ const handleDragChange = async (event, boardId) => {
 .task-card { 
   background: white; 
   padding: 1.25rem; 
-  border-radius: 16px; 
+  border-radius: 12px; 
   border: 1px solid transparent; 
   transition: all 0.2s;
   width: calc(50% - 0.375rem); 
@@ -606,12 +784,143 @@ const handleDragChange = async (event, boardId) => {
 .task-card:hover { border-color: var(--primary); transform: translateY(-3px); }
 .ghost-card { opacity: 0.4; background: var(--primary-light) !important; border: 2px dashed var(--primary) !important; }
 
+/* Lead card elements in Today board */
+.lead-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.lead-avatar {
+  width: 42px;
+  height: 42px;
+  background-color: var(--primary-light);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.lead-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.lead-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--dark);
+  margin: 0;
+}
+.lead-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.tag-interest {
+  background: #FFF8EB;
+  color: #FFA800;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.tag-source {
+  background: #F0F8FF;
+  color: #007BFF;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.lead-desc {
+  font-size: 0.88rem;
+  color: var(--gray);
+  margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+.lead-contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--dark);
+  font-weight: 600;
+}
+.contact-row span {
+  opacity: 0.8;
+}
+
 .card-labels { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
 .tag { font-size: 0.75rem; font-weight: 700; padding: 0.35rem 0.8rem; border-radius: 8px; }
 .tag-priority { color: white; display: flex; align-items: center; gap: 0.4rem; }
 .dot-small { width: 6px; height: 6px; background: white; border-radius: 50%; }
 
-.task-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem; line-height: 1.4; color: var(--dark); }
+.td-lead-profile-mini {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.td-lead-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+
+.td-lead-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.td-lead-phones {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+.td-lead-phones span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.task-header-group { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem; }
+.task-header-group.has-lead { align-items: center; }
+
+.lead-avatar-mini {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.task-title { font-size: 1.1rem; font-weight: 700; line-height: 1.3; color: var(--dark); margin: 0; flex: 1; }
 
 .due-on { font-size: 0.82rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .due-row { display: flex; align-items: center; }
@@ -688,36 +997,362 @@ const handleDragChange = async (event, boardId) => {
 .modal-footer { padding: 1.5rem 2rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; }
 .btn-cancel-modal { padding: 0.8rem 1.5rem; border-radius: 12px; border: 1.5px solid var(--border); font-weight: 700; }
 .btn-create-board { background: var(--primary); color: white; padding: 0.8rem 1.8rem; border-radius: 12px; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+.comment-input-area {
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
 
-/* Details Modal */
+.comment-input-area textarea {
+  width: 100%;
+  resize: none;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+  height: 90px;
+}
+
+.comment-input-area textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(115,102,255,0.1);
+}
+
+.comment-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-send-comment {
+  background: var(--primary);
+  color: white;
+  padding: 0.6rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 700;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-send-comment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-send-comment:not(:disabled):hover {
+  background: #6259e6;
+  box-shadow: 0 4px 12px rgba(115,102,255,0.3);
+}
+
+/* Details Modal Styles synced with Tasks.vue */
 .task-details-box { max-width: 900px; width: 90%; }
-.td-layout { display: flex; height: 600px; }
-.td-left { flex: 1; padding: 2.5rem; border-right: 1px solid var(--border); overflow-y: auto; }
-.td-right { width: 380px; display: flex; flex-direction: column; background: #fcfcfc; }
-.td-header { margin-bottom: 1.5rem; }
-.td-title { font-size: 1.75rem; font-weight: 800; margin-bottom: 2rem; }
-.td-desc h3 { font-size: 0.9rem; color: var(--gray); text-transform: uppercase; margin-bottom: 1rem; letter-spacing: 1px; }
-.td-desc p { background: var(--light); padding: 1.5rem; border-radius: 12px; line-height: 1.6; }
-.td-right-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-.comments-list { flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem; }
-.comment-item { display: flex; gap: 1rem; }
-.comment-avatar { width: 36px; height: 36px; border-radius: 10px; background: var(--primary-light); color: var(--primary); font-weight: 800; display: flex; align-items: center; justify-content: center; }
-.comment-text { background: white; padding: 1rem; border-radius: 0 12px 12px 12px; border: 1px solid var(--border); font-size: 0.95rem; line-height: 1.5; }
-.comment-input-area { padding: 1.5rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 1rem; }
-.comment-input-area textarea { height: 80px; padding: 1rem; border: 1.5px solid var(--border); border-radius: 12px; resize: none; outline: none; }
-.btn-send-comment { background: var(--primary); color: white; padding: 0.7rem 1.5rem; border-radius: 10px; font-weight: 700; border: none; }
 
-.spin { animation: spin 1s linear infinite; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.td-layout {
+  display: flex;
+  height: min(700px, 85vh);
+  background: white;
+}
 
-.dropdown-menu { position: absolute; top: 100%; right: 0; background: white; border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem; z-index: 100; min-width: 150px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-.dropdown-item { width: 100%; padding: 0.6rem; border-radius: 8px; color: var(--danger); font-weight: 700; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s; }
-.dropdown-item:hover { background: #fff1f0; }
+.td-left {
+  flex: 1;
+  padding: 2.5rem;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
 
-@media (max-width: 900px) {
-  .kanban-wrapper { flex-direction: column; align-items: center; }
-  .kanban-column { width: 100%; max-width: 500px; }
-  .td-layout { flex-direction: column; height: auto; }
-  .td-right { width: 100%; border-top: 1px solid var(--border); }
+.td-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.td-close-mobile { display: none; }
+.td-close-desktop { margin-left: auto; }
+
+.td-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--dark);
+  margin-bottom: 2rem;
+  line-height: 1.3;
+}
+
+.td-desc h3 {
+  font-size: 0.85rem;
+  color: var(--gray);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+
+.td-desc p {
+  line-height: 1.6;
+  color: var(--dark);
+  margin-bottom: 2rem;
+  background: var(--light);
+  padding: 1.5rem;
+  border-radius: 12px;
+  font-size: 1rem;
+}
+
+.td-meta {
+  display: flex;
+  gap: 3.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--light);
+}
+
+.td-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.td-meta-item .label {
+  font-size: 0.8rem;
+  color: var(--gray);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.td-meta-item .value {
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: var(--dark);
+}
+
+.td-right {
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  background: #fcfcfc;
+}
+
+.td-right-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+}
+
+.td-right-header h3 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.comments-list {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.comment-item {
+  display: flex;
+  gap: 1rem;
+}
+
+.comment-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.comment-text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--dark);
+  background: white;
+  padding: 0.85rem 1rem;
+  border-radius: 0 12px 12px 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 10px rgba(75,70,92,0.03);
+}
+
+.btn-edit-task, .btn-save-task {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-edit-task {
+  background: var(--light);
+  color: var(--gray);
+}
+.btn-edit-task:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+.btn-save-task {
+  background: var(--primary);
+  color: white;
+}
+.btn-save-task:hover {
+  background: #6259e6;
+  box-shadow: 0 4px 12px rgba(115,102,255,0.3);
+}
+
+.edit-group {
+  margin-bottom: 2rem;
+}
+.edit-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+.edit-input-title {
+  width: 100%;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--dark);
+  border: none;
+  border-bottom: 2px solid var(--primary-light);
+  background: transparent;
+  outline: none;
+  padding: 0.5rem 0;
+  transition: all 0.2s;
+}
+.edit-input-title:focus {
+  border-bottom-color: var(--primary);
+}
+.edit-textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: white;
+  font-size: 1.05rem;
+  color: var(--dark);
+  line-height: 1.6;
+  outline: none;
+  resize: vertical;
+}
+.edit-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(115,102,255,0.1);
+}
+.edit-input-small {
+  padding: 0.4rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--dark);
+  width: 100%;
+  outline: none;
+}
+.edit-input-small:focus { border-color: var(--primary); }
+
+.edit-priority-select select {
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: white;
+  outline: none;
+}
+.edit-priority-select select:focus { border-color: var(--primary); }
+
+.td-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.td-info-body {
+  margin-top: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+/* Dropdown Positioning Fix */
+.dropdown-wrapper {
+  position: relative;
+  display: flex;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.5rem;
+  z-index: 1000;
+  min-width: 160px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  transform-origin: top right;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--dark);
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+}
+
+.dropdown-item:hover {
+  background: var(--light);
+}
+
+.dropdown-item.danger {
+  color: var(--danger);
+}
+
+.dropdown-item.danger:hover {
+  background: #fff5f5;
+}
+
+/* Transition */
+.dropdown-enter-active, .dropdown-leave-active {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dropdown-enter-from, .dropdown-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(-10px);
 }
 </style>

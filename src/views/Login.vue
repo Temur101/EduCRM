@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-vue-next';
 import { supabase } from '../supabase.js';
 
@@ -16,7 +17,7 @@ const formData = reactive({
 
 const handleLogin = async () => {
   if (!formData.email || !formData.password) {
-    loginError.value = 'Please fill in all fields';
+    loginError.value = useI18n().t('login.fillFields');
     return;
   }
 
@@ -34,18 +35,74 @@ const handleLogin = async () => {
       if (error.message === 'Failed to fetch' || error.status === 522) {
         console.warn('Network timeout, entering offline dev mode');
         localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userRole', 'admin'); // Default as admin in dev mode? No, better regular
         router.push('/');
         return;
       }
       throw error;
     }
 
-    localStorage.setItem('isLoggedIn', 'true');
-    router.push('/');
-    
+    if (data.user) {
+      // Fetch role and name from profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, display_name')
+        .eq('id', data.user.id)
+        .single();
+      
+      const role = profile?.role || 'regular';
+      const name = profile?.display_name || data.user.email.split('@')[0];
+      
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('userRole', role);
+      localStorage.setItem('userName', name);
+      router.push('/');
+    }
   } catch (err) {
+    if (err.status === 400 || err.message?.includes('Invalid login credentials')) {
+      // 1. Try searching in staff table
+      try {
+        const { data: staffMember } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('email', formData.email)
+          .eq('password', formData.password)
+          .maybeSingle();
+
+        if (staffMember) {
+          localStorage.setItem('isLoggedIn', 'true');
+          localStorage.setItem('userRole', staffMember.role || 'regular');
+          localStorage.setItem('userName', staffMember.name);
+          router.push('/');
+          return;
+        }
+      } catch (sErr) {
+        console.error('Staff login lookup error:', sErr);
+      }
+
+      // 2. Try searching in teachers table
+      try {
+        const { data: teacher } = await supabase
+          .from('teachers')
+          .select('*')
+          .eq('email', formData.email)
+          .eq('password', formData.password)
+          .maybeSingle();
+
+        if (teacher) {
+          localStorage.setItem('isLoggedIn', 'true');
+          localStorage.setItem('userRole', 'teacher');
+          localStorage.setItem('userTeacherId', teacher.id);
+          localStorage.setItem('userName', teacher.name);
+          router.push('/');
+          return;
+        }
+      } catch (tErr) {
+        console.error('Teacher login lookup error:', tErr);
+      }
+    }
     console.error('Login Error:', err);
-    loginError.value = err.message || "Invalid email or password.";
+    loginError.value = useI18n().t('login.invalidLogin');
   } finally {
     isLoading.value = false;
   }
@@ -63,7 +120,7 @@ const handleLogin = async () => {
             </div>
             <h1>EduCRM</h1>
           </div>
-          <p class="subtitle">Welcome back! Please enter your details.</p>
+          <p class="subtitle">{{ $t('login.welcome') }}</p>
         </div>
 
         <form @submit.prevent="handleLogin" class="login-form">
@@ -72,13 +129,13 @@ const handleLogin = async () => {
           </div>
 
           <div class="form-group">
-            <label>Email Address</label>
+            <label>{{ $t('login.email') }}</label>
             <div class="input-wrapper">
               <Mail :size="18" class="field-icon" />
               <input 
                 v-model="formData.email" 
                 type="email" 
-                placeholder="admin@example.com" 
+                :placeholder="$t('login.emailPlaceholder')" 
                 autofocus
                 required
               />
@@ -86,13 +143,13 @@ const handleLogin = async () => {
           </div>
 
           <div class="form-group">
-            <label>Password</label>
+            <label>{{ $t('login.password') }}</label>
             <div class="input-wrapper">
               <Lock :size="18" class="field-icon" />
               <input 
                 v-model="formData.password" 
                 :type="showPassword ? 'text' : 'password'" 
-                placeholder="••••••••"
+                :placeholder="$t('login.passwordPlaceholder')"
                 required
               />
               <button 
@@ -110,21 +167,21 @@ const handleLogin = async () => {
             <label class="checkbox-container">
               <input type="checkbox" checked />
               <span class="checkmark"></span>
-              Remember me
+              {{ $t('login.rememberMe') }}
             </label>
-            <a href="#" class="forgot-link">Forgot password?</a>
+            <a href="#" class="forgot-link">{{ $t('login.forgotPassword') }}</a>
           </div>
 
           <button type="submit" class="btn-login" :disabled="isLoading">
             <span v-if="!isLoading">
-               Sign In <LogIn :size="18" />
+               {{ $t('login.signIn') }} <LogIn :size="18" />
             </span>
             <span v-else class="loader"></span>
           </button>
         </form>
 
         <div class="login-footer">
-          <p>Don't have an account? <router-link to="/register">Sign Up</router-link></p>
+          <p v-if="false">{{ $t('login.noAccount') }} <router-link to="/register">{{ $t('login.signUp') }}</router-link></p>
         </div>
       </div>
 

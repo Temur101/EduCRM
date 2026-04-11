@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { Mail, Lock, Eye, EyeOff, UserPlus, User } from 'lucide-vue-next';
 import { supabase } from '../supabase.js';
 
@@ -17,7 +18,7 @@ const formData = reactive({
 
 const handleRegister = async () => {
   if (!formData.email || !formData.password || !formData.displayName) {
-    registerError.value = 'Please fill in all fields';
+    registerError.value = useI18n().t('register.fillFields');
     return;
   }
 
@@ -47,13 +48,30 @@ const handleRegister = async () => {
     }
 
     if (data.user) {
+      // Create profile record
+      const { error: profileError } = await supabase.from('profiles').insert([
+        { 
+          id: data.user.id, 
+          email: formData.email,
+          display_name: formData.displayName,
+          role: 'regular' 
+        }
+      ]);
+      
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        // We still log them in even if profile fails, but normally this should be atomic
+      }
+
       localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('userRole', 'regular');
+      localStorage.setItem('userName', formData.displayName);
       router.push('/');
     }
     
   } catch (err) {
     console.error('Registration Error:', err);
-    registerError.value = err.message || "Could not complete registration.";
+    registerError.value = err.message || useI18n().t('register.error');
   } finally {
     isLoading.value = false;
   }
@@ -71,7 +89,7 @@ const handleRegister = async () => {
             </div>
             <h1>EduCRM</h1>
           </div>
-          <p class="subtitle">Join us today! Create your free account.</p>
+          <p class="subtitle">{{ $t('register.title') }}</p>
         </div>
 
         <form @submit.prevent="handleRegister" class="register-form">
@@ -80,13 +98,13 @@ const handleRegister = async () => {
           </div>
 
           <div class="form-group">
-            <label>Full Name</label>
+            <label>{{ $t('register.fullName') }}</label>
             <div class="input-wrapper">
               <User :size="18" class="field-icon" />
               <input 
                 v-model="formData.displayName" 
                 type="text" 
-                placeholder="John Doe" 
+                :placeholder="$t('register.namePlaceholder')" 
                 autofocus
                 required
               />
@@ -94,26 +112,26 @@ const handleRegister = async () => {
           </div>
 
           <div class="form-group">
-            <label>Email Address</label>
+            <label>{{ $t('login.email') }}</label>
             <div class="input-wrapper">
               <Mail :size="18" class="field-icon" />
               <input 
                 v-model="formData.email" 
                 type="email" 
-                placeholder="admin@example.com" 
+                :placeholder="$t('login.emailPlaceholder')" 
                 required
               />
             </div>
           </div>
 
           <div class="form-group">
-            <label>Password</label>
+            <label>{{ $t('login.password') }}</label>
             <div class="input-wrapper">
               <Lock :size="18" class="field-icon" />
               <input 
                 v-model="formData.password" 
                 :type="showPassword ? 'text' : 'password'" 
-                placeholder="••••••••"
+                :placeholder="$t('login.passwordPlaceholder')"
                 required
               />
               <button 
@@ -129,14 +147,14 @@ const handleRegister = async () => {
 
           <button type="submit" class="btn-register" :disabled="isLoading">
             <span v-if="!isLoading">
-               Create Account <UserPlus :size="18" />
+               {{ $t('register.createAccount') }} <UserPlus :size="18" />
             </span>
             <span v-else class="loader"></span>
           </button>
         </form>
 
         <div class="register-footer">
-          <p>Already have an account? <router-link to="/login">Sign In</router-link></p>
+          <p>{{ $t('register.alreadyHaveAccount') }} <router-link to="/login">{{ $t('login.signIn') }}</router-link></p>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { 
   LayoutDashboard, 
@@ -10,27 +10,66 @@ import {
   UserCheck, 
   Archive, 
   MessageSquare,
+  BookOpen,
   ChevronRight,
-  LogOut
+  LogOut,
+  GraduationCap,
+  DoorOpen,
+  ShieldCheck,
+  Bell
 } from 'lucide-vue-next';
 
 const router = useRouter();
 const showLogout = ref(false);
+const userRole = ref(localStorage.getItem('userRole') || 'regular');
+const userName = ref(localStorage.getItem('userName') || 'User');
+
+const menuItems = [
+  { key: 'sidebar.dashboard', path: '/', icon: LayoutDashboard },
+  { key: 'sidebar.tasks', path: '/tasks', icon: CheckSquare },
+  { key: 'sidebar.leads', path: '/leads', icon: Users },
+  { key: 'sidebar.students', path: '/students', icon: GraduationCap },
+  { key: 'sidebar.payments', path: '/payments', icon: CreditCard },
+  { key: 'sidebar.reminders', path: '/reminders', icon: Bell },
+  { key: 'sidebar.today', path: '/today', icon: Calendar },
+  { key: 'sidebar.archive', path: '/archive', icon: Archive },
+  { key: 'sidebar.teachers', path: '/teachers', icon: UserCheck },
+  { key: 'sidebar.courses', path: '/courses', icon: BookOpen },
+  { key: 'sidebar.groups', path: '/groups', icon: Users },
+  { key: 'sidebar.rooms', path: '/rooms', icon: DoorOpen },
+  { key: 'sidebar.botManager', path: '/bot-manager', icon: MessageSquare },
+  { key: 'sidebar.staff', path: '/staff', icon: ShieldCheck },
+];
+
+const adminOnlyKeys = ['sidebar.payments', 'sidebar.reminders', 'sidebar.archive', 'sidebar.botManager', 'sidebar.staff'];
+const teacherHiddenKeys = [
+  'sidebar.leads', 
+  'sidebar.payments', 
+  'sidebar.reminders', 
+  'sidebar.archive', 
+  'sidebar.teachers', 
+  'sidebar.courses', 
+  'sidebar.rooms', 
+  'sidebar.botManager',
+  'sidebar.staff',
+  'sidebar.tasks',
+  'sidebar.today'
+];
+
+const filteredMenuItems = computed(() => {
+  if (userRole.value === 'admin') return menuItems;
+  if (userRole.value === 'teacher') {
+    return menuItems.filter(item => !teacherHiddenKeys.includes(item.key));
+  }
+  return menuItems.filter(item => !adminOnlyKeys.includes(item.key));
+});
 
 const handleLogout = () => {
   localStorage.removeItem('isLoggedIn');
+  localStorage.removeItem('userRole');
+  localStorage.removeItem('userName');
   router.push('/login');
 };
-
-const menuItems = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Tasks', path: '/tasks', icon: CheckSquare },
-  { name: 'Leads', path: '/leads', icon: Users },
-  { name: 'Payments', path: '/payments', icon: CreditCard },
-  { name: 'Today', path: '/today', icon: Calendar },
-  { name: 'Archive', path: '/archive', icon: Archive },
-  { name: 'Bot manager', path: '/bot-manager', icon: MessageSquare },
-];
 </script>
 
 <template>
@@ -44,16 +83,16 @@ const menuItems = [
     
     <nav class="sidebar-nav">
       <div class="menu-section">
-        <p class="section-title">MAIN MENU</p>
+        <p class="section-title">{{ $t('sidebar.mainMenu') || 'MAIN MENU' }}</p>
         <router-link 
-          v-for="item in menuItems" 
-          :key="item.name" 
+          v-for="item in filteredMenuItems" 
+          :key="item.key" 
           :to="item.path"
           class="nav-item"
           active-class="active"
         >
           <component :is="item.icon" :size="20" class="icon" />
-          <span class="name">{{ item.name }}</span>
+          <span class="name">{{ $t(item.key) }}</span>
           <ChevronRight :size="16" class="arrow" />
         </router-link>
       </div>
@@ -61,16 +100,21 @@ const menuItems = [
     
     <div class="sidebar-footer">
       <div class="user-info" @click="showLogout = !showLogout" :class="{ 'active': showLogout }">
-        <img src="https://ui-avatars.com/api/?name=Admin&background=7366FF&color=fff" alt="User">
+        <div class="user-avatar-placeholder">
+          {{ userName.charAt(0).toUpperCase() }}
+        </div>
         <div>
-          <p class="user-name">Admin User</p>
-          <p class="user-role">Super Admin</p>
+          <p class="user-name">{{ userName }}</p>
+          <p class="user-role">{{ 
+            userRole === 'admin' ? $t('sidebar.role') : 
+            (userRole === 'teacher' ? $t('teachers.teacher') : ($t('sidebar.regular') || 'Regular User'))
+          }}</p>
         </div>
       </div>
       
       <div class="logout-menu" :class="{ 'show': showLogout }" @click="handleLogout">
         <LogOut :size="18" class="logout-icon" />
-        <span>Logout</span>
+        <span>{{ $t('sidebar.logout') || 'Logout' }}</span>
       </div>
     </div>
   </aside>
@@ -88,6 +132,19 @@ const menuItems = [
   left: 0;
   top: 0;
   z-index: 100;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (max-width: 991px) {
+  .sidebar {
+    transform: translateX(-100%);
+    box-shadow: 10px 0 25px rgba(0,0,0,0.1);
+    width: 280px;
+  }
+  
+  .sidebar.show {
+    transform: translateX(0);
+  }
 }
 
 .sidebar-header {
@@ -187,10 +244,18 @@ const menuItems = [
   background: var(--primary-light);
 }
 
-.user-info img {
+.user-avatar-placeholder {
   width: 40px;
   height: 40px;
+  background: var(--primary);
+  color: white;
   border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .user-name {

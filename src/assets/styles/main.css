@@ -29,7 +29,6 @@ body {
   background-color: var(--light);
   color: var(--dark);
   line-height: 1.5;
-  overflow-x: hidden;
 }
 
 a {
@@ -158,4 +157,57 @@ h4 {
 
 .spin {
   animation: spin 1s linear infinite;
+}
+
+/* Mobile & Tablet Responsive Queries */
+@media (max-width: 991px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+  
+  .container {
+    padding: 1.5rem;
+  }
+  
+  .card {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .dashboard-content-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .search-box {
+    width: 200px !important;
+  }
+}
+
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 991px) {
+  .mobile-only {
+    display: flex;
+  }
+}
+
+.desktop-only {
+  display: flex;
+}
+
+@media (max-width: 991px) {
+  .desktop-only {
+    display: none;
+  }
 }

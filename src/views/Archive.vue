@@ -12,7 +12,13 @@ import {
   Eye,
   X,
   MessageSquare,
-  Send
+  Send,
+  GraduationCap,
+  DoorOpen,
+  AlertTriangle,
+  Loader2,
+  User,
+  BookOpen
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, reactive } from 'vue';
 import { supabase } from '../supabase.js';
@@ -23,6 +29,28 @@ const searchQuery = ref('');
 const activeFilter = ref('All');
 const selectedItem = ref(null);
 const showDetailsModal = ref(false);
+
+const statusModal = reactive({
+  show: false,
+  type: 'success',
+  title: '',
+  message: ''
+});
+
+const showStatus = (type, title, message) => {
+  statusModal.show = true;
+  statusModal.type = type;
+  statusModal.title = title;
+  statusModal.message = message;
+  if (type === 'success') {
+    setTimeout(() => { statusModal.show = false; }, 3000);
+  }
+};
+
+const showDeleteModal = ref(false);
+const itemToDeleteId = ref(null);
+const isDeletingPermanently = ref(false);
+const restoringId = ref(null);
 
 const loadArchives = async () => {
   isLoading.value = true;
@@ -43,7 +71,7 @@ const loadArchives = async () => {
 
 onMounted(loadArchives);
 
-const typeFilters = ['All', 'Task', 'Lead', 'Payment'];
+const typeFilters = ['All', 'Task', 'Lead', 'Payment', 'Teacher', 'Room', 'Group', 'Student', 'Course'];
 
 const filteredArchives = computed(() => {
   let items = archivedItems.value;
@@ -68,6 +96,11 @@ const getTypeIcon = (type) => {
     case 'task': return CheckSquare;
     case 'lead': return Users;
     case 'payment': return CreditCard;
+    case 'teacher': return GraduationCap;
+    case 'room': return DoorOpen;
+    case 'group': return Users;
+    case 'student': return User;
+    case 'course': return BookOpen;
     default: return Archive;
   }
 };
@@ -77,6 +110,11 @@ const getTypeColor = (type) => {
     case 'task': return '#7366FF';
     case 'lead': return '#FF9F43';
     case 'payment': return '#28C76F';
+    case 'teacher': return '#4F46E5';
+    case 'room': return '#F59E0B';
+    case 'group': return '#7366FF';
+    case 'student': return '#00CFE8';
+    case 'course': return '#9E5CF2';
     default: return '#4B465C';
   }
 };
@@ -96,6 +134,11 @@ const getItemTitle = (item) => {
   if (item.type === 'task') return d.title;
   if (item.type === 'lead') return d.name;
   if (item.type === 'payment') return `${d.student} - ${d.amount} UZS`;
+  if (item.type === 'teacher') return d.name;
+  if (item.type === 'room') return d.name;
+  if (item.type === 'group') return d.name;
+  if (item.type === 'student') return d.name;
+  if (item.type === 'course') return d.name;
   return item.original_id;
 };
 
@@ -120,12 +163,19 @@ const closeDetails = () => {
 };
 
 const restoreItem = async (item) => {
+  if (restoringId.value) return;
+  restoringId.value = item.id;
   try {
-    const tableName = item.type === 'task' ? 'tasks' : (item.type === 'lead' ? 'leads' : 'payments');
+    const tableName = 
+      item.type === 'task' ? 'tasks' : 
+      (item.type === 'lead' ? 'leads' : 
+      (item.type === 'payment' ? 'payments' : 
+      (item.type === 'teacher' ? 'teachers' : 
+      (item.type === 'group' ? 'groups' : 
+      (item.type === 'student' ? 'students' : 
+      (item.type === 'course' ? 'courses' : 'rooms'))))));
     
-    // Normalize data (remove id if it exists as type double or handle appropriately)
     const restoreData = { ...item.data };
-    
     const { error: restoreError } = await supabase.from(tableName).insert([restoreData]);
     if (restoreError) throw restoreError;
     
@@ -133,22 +183,37 @@ const restoreItem = async (item) => {
     if (deleteError) throw deleteError;
     
     archivedItems.value = archivedItems.value.filter(i => i.id !== item.id);
-    alert(`${item.type.charAt(0).toUpperCase() + item.type.slice(1)} restored successfully!`);
+    closeDetails();
+    showStatus('success', 'Muvaffaqiyatli!', `${item.type.charAt(0).toUpperCase() + item.type.slice(1)} muvaffaqiyatli tiklandi.`);
   } catch (e) {
     console.error('Error restoring:', e);
-    alert('Failed to restore item.');
+    showStatus('error', 'Xatolik', 'Elementni tiklashda xatolik yuz berdi.');
+  } finally {
+    restoringId.value = null;
   }
 };
 
-const permanentDelete = async (id) => {
-  if (!confirm('Are you sure you want to permanently delete this item? This cannot be undone.')) return;
+const confirmPermanentDelete = (id) => {
+  itemToDeleteId.value = id;
+  showDeleteModal.value = true;
+};
+
+const permanentDelete = async () => {
+  if (!itemToDeleteId.value || isDeletingPermanently.value) return;
   
+  isDeletingPermanently.value = true;
   try {
-    const { error } = await supabase.from('archives').delete().eq('id', id);
+    const { error } = await supabase.from('archives').delete().eq('id', itemToDeleteId.value);
     if (error) throw error;
-    archivedItems.value = archivedItems.value.filter(i => i.id !== id);
+    archivedItems.value = archivedItems.value.filter(i => i.id !== itemToDeleteId.value);
+    showDeleteModal.value = false;
+    showStatus('success', 'O\'chirildi', 'Element butunlay o\'chirib tashlandi.');
   } catch (e) {
     console.error('Error deleting:', e);
+    showStatus('error', 'Xatolik', 'O\'chirishda xatolik yuz berdi.');
+  } finally {
+    isDeletingPermanently.value = false;
+    itemToDeleteId.value = null;
   }
 };
 
@@ -158,8 +223,8 @@ const permanentDelete = async (id) => {
   <div class="archive-page">
     <div class="page-header">
       <div class="header-content">
-        <h1>Archives</h1>
-        <p>Manage deleted accounts, leads, and historical data</p>
+        <h1>{{ $t('archive.title') }}</h1>
+        <p>{{ $t('archive.subtitle') }}</p>
       </div>
     </div>
 
@@ -167,7 +232,7 @@ const permanentDelete = async (id) => {
     <div class="archive-filters">
       <div class="search-bar">
         <Search :size="18" />
-        <input v-model="searchQuery" type="text" placeholder="Search archives..." />
+        <input v-model="searchQuery" type="text" :placeholder="$t('archive.searchPlaceholder')" />
       </div>
       
       <div class="type-tabs">
@@ -177,7 +242,7 @@ const permanentDelete = async (id) => {
           :class="['tab', { active: activeFilter === t }]"
           @click="activeFilter = t"
         >
-          {{ t }}s
+          {{ $t('archive.' + t.toLowerCase()) }}
         </button>
       </div>
     </div>
@@ -188,11 +253,11 @@ const permanentDelete = async (id) => {
         <table>
           <thead>
             <tr>
-              <th>Type</th>
-              <th>Content Title</th>
-              <th>Archived At</th>
-              <th>Original ID</th>
-              <th class="actions-col">Actions</th>
+              <th>{{ $t('archive.type') }}</th>
+              <th>{{ $t('archive.contentTitle') }}</th>
+              <th>{{ $t('archive.archivedAt') }}</th>
+              <th>{{ $t('archive.originalId') }}</th>
+              <th class="actions-col">{{ $t('archive.actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -227,7 +292,7 @@ const permanentDelete = async (id) => {
               <td colspan="5" class="empty-state">
                 <div class="empty-content">
                   <Archive :size="48" />
-                  <p>No archived items found</p>
+                  <p>{{ $t('archive.noItems') }}</p>
                 </div>
               </td>
             </tr>
@@ -255,11 +320,13 @@ const permanentDelete = async (id) => {
                     <button class="btn-action view" @click="openDetails(item)" title="View Details">
                       <Eye :size="16" />
                     </button>
-                    <button class="btn-action restore" @click="restoreItem(item)" title="Restore">
-                      <RotateCcw :size="16" />
+                    <button class="btn-action restore" @click="restoreItem(item)" title="Restore" :disabled="restoringId === item.id">
+                      <Loader2 v-if="restoringId === item.id" :size="16" class="spin" />
+                      <RotateCcw v-else :size="16" />
                     </button>
-                    <button class="btn-action delete" @click="permanentDelete(item.id)" title="Permanent Delete">
-                      <Trash2 :size="16" />
+                    <button class="btn-action delete" @click="confirmPermanentDelete(item.id)" title="Permanent Delete" :disabled="isDeletingPermanently && itemToDeleteId === item.id">
+                      <Loader2 v-if="isDeletingPermanently && itemToDeleteId === item.id" :size="16" class="spin" />
+                      <Trash2 v-else :size="16" />
                     </button>
                   </div>
                 </td>
@@ -278,29 +345,29 @@ const permanentDelete = async (id) => {
             <!-- Left Side: Details -->
             <div class="td-left">
               <div class="modal-header no-border">
-                <h3>Archived {{ selectedItem.type }} Details</h3>
+                <h3>{{ $t('archive.detailsTitle', { type: selectedItem.type }) }}</h3>
                 <button class="btn-icon td-close-mobile" @click="closeDetails"><X :size="20" /></button>
               </div>
               
               <div class="details-grid">
                 <template v-if="selectedItem.type.toLowerCase() === 'task'">
                   <div class="detail-item">
-                    <label>Title</label>
+                    <label>{{ $t('tasks.taskTitle') || 'Title' }}</label>
                     <p class="value">{{ selectedItem.data.title }}</p>
                   </div>
                   <div class="detail-item">
-                    <label>Description</label>
-                    <p class="value note">{{ selectedItem.data.description || 'No description' }}</p>
+                    <label>{{ $t('tasks.description') || 'Description' }}</label>
+                    <p class="value note">{{ selectedItem.data.description || $t('tasks.noDescription') }}</p>
                   </div>
                   <div class="detail-row">
                     <div class="detail-item">
-                    <label>Priority</label>
+                    <label>{{ $t('tasks.priority') || 'Priority' }}</label>
                     <span class="tag tag-priority" :style="{ backgroundColor: getPriorityColor(selectedItem.data.priority) }">
-                      <span class="dot-small"></span> {{ selectedItem.data.priority }}
+                      <span class="dot-small"></span> {{ $t('tasks.' + selectedItem.data.priority?.toLowerCase()) || selectedItem.data.priority }}
                     </span>
                   </div>
                     <div class="detail-item">
-                      <label>Due Date</label>
+                      <label>{{ $t('tasks.dueDate') || 'Due Date' }}</label>
                       <p class="value">{{ selectedItem.data.dueDate || selectedItem.data.due_date }}</p>
                     </div>
                   </div>
@@ -308,22 +375,22 @@ const permanentDelete = async (id) => {
 
                 <template v-else-if="selectedItem.type.toLowerCase() === 'lead'">
                   <div class="detail-item">
-                    <label>Name</label>
+                    <label>{{ $t('leads.name') }}</label>
                     <p class="value">{{ selectedItem.data.name }}</p>
                   </div>
                   <div class="detail-item">
-                    <label>Source</label>
+                    <label>{{ $t('leads.source') }}</label>
                     <p class="value">{{ selectedItem.data.source }}</p>
                   </div>
                   <div class="detail-row">
                     <div class="detail-item">
-                    <label>Priority</label>
+                    <label>{{ $t('leads.priority') }}</label>
                     <span class="tag tag-priority" :style="{ backgroundColor: getPriorityColor(selectedItem.data.priority) }">
-                      <span class="dot-small"></span> {{ selectedItem.data.priority }}
+                      <span class="dot-small"></span> {{ $t('leads.' + selectedItem.data.priority?.toLowerCase()) || selectedItem.data.priority }}
                     </span>
                   </div>
                     <div class="detail-item">
-                      <label>Status</label>
+                      <label>{{ $t('payments.status') }}</label>
                       <p class="value">{{ selectedItem.data.status }}</p>
                     </div>
                   </div>
@@ -331,30 +398,136 @@ const permanentDelete = async (id) => {
 
                 <template v-else-if="selectedItem.type.toLowerCase() === 'payment'">
                   <div class="detail-item">
-                    <label>Student Name</label>
+                    <label>{{ $t('payments.studentName') }}</label>
                     <p class="value">{{ selectedItem.data.student_name || selectedItem.data.student }}</p>
                   </div>
                   <div class="detail-row">
                     <div class="detail-item">
-                      <label>Amount</label>
+                      <label>{{ $t('payments.amount') }}</label>
                       <p class="value highlight">{{ selectedItem.data.amount }} UZS</p>
                     </div>
                     <div class="detail-item">
-                      <label>Method</label>
+                      <label>{{ $t('payments.method') }}</label>
                       <p class="value">{{ selectedItem.data.method }}</p>
                     </div>
                   </div>
                   <div class="detail-item">
-                    <label>Date</label>
+                    <label>{{ $t('payments.date') }}</label>
                     <p class="value">{{ selectedItem.data.date }}</p>
+                  </div>
+                </template>
+
+                <template v-else-if="selectedItem.type.toLowerCase() === 'teacher'">
+                  <div class="detail-item">
+                    <label>{{ $t('teachers.name') || 'Full Name' }}</label>
+                    <p class="value">{{ selectedItem.data.name }}</p>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-item">
+                      <label>{{ $t('teachers.subject') || 'Subject' }}</label>
+                      <p class="value">{{ selectedItem.data.subject }}</p>
+                    </div>
+                    <div class="detail-item">
+                      <label>{{ $t('teachers.phone') || 'Phone' }}</label>
+                      <p class="value">{{ selectedItem.data.phone }}</p>
+                    </div>
+                  </div>
+                  <div class="detail-item">
+                    <label>{{ $t('teachers.email') || 'Email' }}</label>
+                    <p class="value">{{ selectedItem.data.email || 'No email' }}</p>
+                  </div>
+                </template>
+
+                <template v-else-if="selectedItem.type.toLowerCase() === 'room'">
+                  <div class="detail-item">
+                    <label>{{ $t('rooms.name') || 'Room Name' }}</label>
+                    <p class="value">{{ selectedItem.data.name }}</p>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-item">
+                      <label>{{ $t('rooms.capacity') || 'Capacity' }}</label>
+                      <p class="value highlight">{{ selectedItem.data.capacity }}</p>
+                    </div>
+                  </div>
+                  <div class="detail-item">
+                    <label>{{ $t('rooms.description') || 'Description' }}</label>
+                    <p class="value note">{{ selectedItem.data.description || 'No description' }}</p>
+                  </div>
+                </template>
+
+                <template v-else-if="selectedItem.type.toLowerCase() === 'group'">
+                  <div class="detail-item">
+                    <label>{{ $t('groups.name') || 'Group Name' }}</label>
+                    <p class="value">{{ selectedItem.data.name }}</p>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-item">
+                      <label>{{ $t('groups.course') || 'Course' }}</label>
+                      <p class="value">{{ selectedItem.data.courses?.name || '-' }}</p>
+                    </div>
+                    <div class="detail-item">
+                      <label>{{ $t('groups.teacher') || 'Teacher' }}</label>
+                      <p class="value">{{ selectedItem.data.teachers?.name || '-' }}</p>
+                    </div>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-item">
+                      <label>{{ $t('groups.days') || 'Days' }}</label>
+                      <p class="value">{{ selectedItem.data.days || '-' }}</p>
+                    </div>
+                    <div class="detail-item">
+                      <label>{{ $t('groups.time') || 'Time' }}</label>
+                      <p class="value">{{ selectedItem.data.time || '-' }}</p>
+                    </div>
+                  </div>
+                </template>
+
+                <template v-else-if="selectedItem.type.toLowerCase() === 'student'">
+                  <div class="detail-item">
+                    <label>{{ $t('students.name') || 'Student Name' }}</label>
+                    <p class="value">{{ selectedItem.data.name }}</p>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-item">
+                      <label>{{ $t('students.phone') || 'Phone' }}</label>
+                      <p class="value">{{ selectedItem.data.phone || '-' }}</p>
+                    </div>
+                    <div class="detail-item">
+                      <label>{{ $t('students.status') || 'Status' }}</label>
+                      <p class="value">{{ selectedItem.data.status || '-' }}</p>
+                    </div>
+                  </div>
+                  <div class="detail-item">
+                    <label>{{ $t('students.group') }}</label>
+                    <p class="value">{{ selectedItem.data.groups?.name || 'No group' }}</p>
+                  </div>
+                </template>
+
+                <template v-else-if="selectedItem.type.toLowerCase() === 'course'">
+                  <div class="detail-item">
+                    <label>{{ $t('courses.name') || 'Course Name' }}</label>
+                    <p class="value">{{ selectedItem.data.name }}</p>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-item">
+                      <label>{{ $t('courses.category') || 'Category' }}</label>
+                      <p class="value">{{ selectedItem.data.category || '-' }}</p>
+                    </div>
+                    <div class="detail-item">
+                      <label>{{ $t('courses.price') || 'Price' }}</label>
+                      <p class="value">{{ formatCurrency(selectedItem.data.price) }}</p>
+                    </div>
                   </div>
                 </template>
               </div>
 
               <div class="modal-footer">
-                <button class="btn btn-white" @click="closeDetails">Close</button>
-                <button class="btn btn-primary btn-restore-large" @click="restoreItem(selectedItem)">
-                  <RotateCcw :size="18" /> Restore to {{ selectedItem.type }}s
+                <button class="btn-outline" @click="closeDetails">{{ $t('common.cancel') }}</button>
+                <button class="btn btn-primary btn-restore-large" @click="restoreItem(selectedItem)" :disabled="restoringId">
+                  <Loader2 v-if="restoringId" :size="18" class="spin" />
+                  <template v-else>
+                    <RotateCcw :size="18" /> {{ $t('archive.restoreTo', { type: selectedItem.type }) }}
+                  </template>
                 </button>
               </div>
             </div>
@@ -364,7 +537,7 @@ const permanentDelete = async (id) => {
               <div class="td-right-header">
                 <div class="header-title">
                   <MessageSquare :size="18" />
-                  <h3>History & Comments</h3>
+                  <h3>{{ $t('archive.history') }}</h3>
                 </div>
                 <button class="btn-icon td-close-desktop" @click="closeDetails"><X :size="20" /></button>
               </div>
@@ -384,14 +557,55 @@ const permanentDelete = async (id) => {
                 </template>
                 <div v-else class="no-comments">
                   <MessageSquare :size="32" />
-                  <p>No comments found for this record.</p>
+                  <p>{{ $t('archive.noComments') }}</p>
                 </div>
               </div>
               
               <div class="archive-note">
-                <p>This record is archived. To add new comments, please restore the item first.</p>
+                <p>{{ $t('archive.readOnly') }}</p>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Permanent Delete Confirmation Modal -->
+    <transition name="modal">
+      <div v-if="showDeleteModal" class="modal-overlay" @click.self="showDeleteModal = false">
+        <div class="modal-box confirm-modal-small">
+          <div class="modal-body text-center p-2rem">
+            <div class="confirm-icon-large danger">
+              <Trash2 :size="48" />
+            </div>
+            <h2 class="confirm-title">{{ $t('common.areYouSure') }}</h2>
+            <p class="confirm-desc">{{ $t('archive.deleteConfirm') }}</p>
+            <div class="confirm-actions">
+              <button class="btn-cancel-action" @click="showDeleteModal = false" :disabled="isDeletingPermanently">{{ $t('common.cancel') }}</button>
+              <button class="btn-danger-confirm-action" @click="permanentDelete" :disabled="isDeletingPermanently">
+                <Loader2 v-if="isDeletingPermanently" :size="18" class="spin" />
+                <span v-else>{{ $t('common.delete') }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Final Status Modal (Success/Error) -->
+    <transition name="modal">
+      <div v-if="statusModal.show" class="modal-overlay" @click.self="statusModal.show = false">
+        <div class="modal-box status-msg-modal">
+          <div class="modal-body text-center p-2.5rem">
+            <div class="status-icon-circle" :class="statusModal.type">
+              <CheckSquare v-if="statusModal.type === 'success'" :size="48" />
+              <AlertTriangle v-else :size="48" />
+            </div>
+            <h2 class="status-title">{{ statusModal.title }}</h2>
+            <p class="status-desc">{{ statusModal.message }}</p>
+            <button class="btn-status-close" :class="statusModal.type" @click="statusModal.show = false">
+              OK
+            </button>
           </div>
         </div>
       </div>
@@ -624,9 +838,27 @@ td {
   flex-direction: column;
 }
 
+.modal-header {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--dark);
+}
+
 .modal-header.no-border {
   border-bottom: none;
 }
+
+.modal-body { padding: 1.5rem; }
+.p-2rem { padding: 2rem; }
+.p-2\.5rem { padding: 2.5rem; }
+.text-center { text-align: center; }
 
 .td-right-header {
   padding: 1.5rem;
@@ -820,30 +1052,50 @@ td {
   font-weight: 600;
 }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
+/* --- Status & Confirm Modals --- */
+.status-msg-modal { max-width: 400px; background: white; border-radius: 30px; overflow: hidden; padding: 1rem; }
+.status-icon-circle { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
+.status-icon-circle.success { background: #e8f9ee; color: var(--success); }
+.status-icon-circle.error { background: #fff5f5; color: var(--danger); }
+.status-title { font-size: 1.6rem; font-weight: 800; color: var(--dark); margin-bottom: 0.5rem; text-align: center; }
+.status-desc { color: var(--gray); font-weight: 600; margin-bottom: 2rem; line-height: 1.5; padding: 0 1rem; text-align: center; }
+.btn-status-close { width: 100%; padding: 1rem; border-radius: 14px; font-weight: 700; color: white; transition: all 0.2s; font-size: 1rem; }
+.btn-status-close.success { background: var(--success); box-shadow: 0 4px 12px rgba(40, 199, 111, 0.3); }
+.btn-status-close.error { background: var(--danger); box-shadow: 0 4px 12px rgba(234, 84, 85, 0.3); }
+.btn-status-close:hover { transform: translateY(-2px); opacity: 0.9; }
 
-.modal-box {
-  background: white;
-  border-radius: 20px;
-  box-shadow: var(--shadow);
-}
+.confirm-modal-small { max-width: 420px; background: white; border-radius: 28px; overflow: hidden; }
+.confirm-icon-large { width: 88px; height: 88px; margin: 0 auto 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.confirm-icon-large.danger { background: #fff5f5; color: var(--danger); }
+.confirm-title { font-size: 1.6rem; font-weight: 800; color: var(--dark); margin-bottom: 0.75rem; text-align: center; }
+.confirm-desc { color: var(--gray); font-weight: 600; text-align: center; margin-bottom: 2rem; line-height: 1.5; }
+.confirm-actions { display: flex; gap: 1.25rem; padding: 0 1rem; margin-bottom: 1rem; }
+.btn-cancel-action { flex: 1; padding: 1rem; border-radius: 14px; background: var(--light); color: var(--gray); font-weight: 700; transition: all 0.2s; }
+.btn-danger-confirm-action { flex: 1; padding: 1rem; border-radius: 14px; background: var(--danger); color: white; font-weight: 700; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(234, 84, 85, 0.3); }
+.btn-danger-confirm-action:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(234, 84, 85, 0.4); }
 
-.modal-header {
-  padding: 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--border);
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; }
+@keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Global Modal Styles */
+.modal-overlay { 
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  right: 0; 
+  bottom: 0; 
+  background: rgba(0, 0, 0, 0.5); 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  z-index: 10000; 
+  backdrop-filter: blur(4px); 
 }
+.modal-box { background: white; border-radius: 20px; box-shadow: var(--shadow); }
+
+.modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
 </style>
