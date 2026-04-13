@@ -307,7 +307,8 @@ const confirmAddTask = async () => {
   const boardId = targetBoardId.value;
   const boardIndex = boards.value.findIndex(b => b.id === boardId);
   if (boardIndex > -1) {
-    const creationDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const locale = localStorage.getItem('userLanguage') === 'uz' ? 'uz-UZ' : 'ru-RU';
+    const creationDate = new Date().toLocaleDateString(locale, { day: '2-digit', month: 'long', year: 'numeric' });
     const dbTask = {
       id: `task-today-${Date.now()}`,
       board_id: boardId,

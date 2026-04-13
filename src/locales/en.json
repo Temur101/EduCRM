@@ -105,6 +105,7 @@
         "high": "High",
         "medium": "Medium",
         "low": "Low",
+        "all": "All",
         "creating": "Creating...",
         "noTasks": "No tasks yet.",
         "addBoardBtn": "Add Board",
@@ -169,7 +170,9 @@
         "methodLabel": "Payment Method",
         "monthColumn": "Month",
         "commentColumn": "Comment",
-        "confirmBtn": "Confirm Payment"
+        "confirmBtn": "Confirm Payment",
+        "expected": "Expected Payments",
+        "activeReminders": "Active Promises/Reminders"
     },
     "archive": {
         "title": "Archives",
@@ -377,7 +380,16 @@
         "arrivalTime": "Arrival Time",
         "month": "Month",
         "comment": "Comment",
-        "noPaymentHistory": "No payment history found"
+        "noPaymentHistory": "No payment history found",
+        "payNow": "Save Payment",
+        "makePromise": "Make Promise",
+        "promiseSave": "Save Promise",
+        "promiseDate": "Promise Date",
+        "promiseAmount": "Amount",
+        "promiseNote": "Note",
+        "promiseHistory": "Promise History",
+        "noPromises": "No promises yet",
+        "lessonDays": "Lesson Days"
     },
     "common": {
         "search": "Search",
@@ -400,7 +412,18 @@
         "attendance": "Attendance",
         "addNewRow": "Add new row",
         "password": "Password",
-        "passwordPlaceholder": "Enter a secure password"
+        "passwordPlaceholder": "Enter a secure password",
+        "day": "day",
+        "cancel": "Cancel",
+        "all": "All",
+        "clear": "Clear"
+    },
+    "attendance": {
+        "title": "Attendance",
+        "monthFinishedNote": "Month finished — by attendance",
+        "manualSelectNote": "Select attendance days",
+        "manualEntry": "Manual",
+        "byAtt": "By Att."
     },
     "rooms": {
         "title": "Learning Rooms",
@@ -438,5 +461,35 @@
         "admin": "Admin",
         "regular": "Staff",
         "teacher": "Teacher"
+    },
+    "reminders": {
+        "title": "Payment Promises",
+        "subtitle": "Track and manage student payment promises",
+        "pending": "Pending",
+        "overdue": "Overdue",
+        "total": "Total",
+        "student": "Student",
+        "group": "Group",
+        "amount": "Amount",
+        "promisedDate": "Promise Date",
+        "status": "Status",
+        "notes": "Notes",
+        "markPaid": "Mark as Paid",
+        "revertPending": "Revert to Pending",
+        "cancelItem": "Cancel",
+        "delete": "Delete",
+        "noRecords": "No payment promises found",
+        "searchPlaceholder": "Search by student or group...",
+        "results": "results",
+        "deleteConfirmTitle": "Are you sure?",
+        "deleteConfirmText": "This promise record will be permanently deleted.",
+        "noGroup": "No Group",
+        "deleteBtn": "Delete",
+        "cancelBtn": "Cancel",
+        "statusPaid": "Paid",
+        "overdueDays": "{n} days overdue",
+        "todayLabel": "Due Today",
+        "remainingDays": "{n} days left",
+        "days": "{n} days"
     }
 }

@@ -11,11 +11,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Copy,
-  Plus
+  Plus,
+  Users
 } from 'lucide-vue-next';
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { supabase } from '../supabase.js';
+
+const { t } = useI18n();
 
 const isEditing = ref(false);
 const botToken = ref('************************************');
@@ -24,9 +27,9 @@ const connectionStatus = ref('active'); // active, error, dormant
 const webhookUrl = ref('https://your-crm-functions.supabase.co/functions/v1/telegram-bot');
 
 const logs = ref([
-  { id: 1, type: 'info', msg: 'Bot connected to "IT Academy Staff"', time: '22:30' },
-  { id: 2, type: 'success', msg: 'New task created: "Nodiraopa Teacher: Mansur (Yoq)"', time: '22:31' },
-  { id: 3, type: 'info', msg: 'Syncing with Today List...', time: '22:31' },
+  { id: 1, type: 'info', msg: t('bot.logConnected', { group: 'IT Academy Staff' }), time: '22:30' },
+  { id: 2, type: 'success', msg: t('bot.logTaskCreated', { task: 'Nodiraopa Teacher: Mansur (Yoq)' }), time: '22:31' },
+  { id: 3, type: 'info', msg: t('bot.logSyncing'), time: '22:31' },
 ]);
 
 const toggleEdit = () => {
@@ -40,10 +43,9 @@ const saveConfig = () => {
 
 const copyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl.value);
-    alert(useI18n().t('bot.webhookCopied'));
+    alert(t('bot.webhookCopied'));
 };
 
-// Mock data for group members
 const groupMembers = [
   { name: 'Nodiraopa Teacher', role: 'Teacher', avatar: 'N' },
   { name: 'Shohruh Tech', role: 'Admin', avatar: 'S' },

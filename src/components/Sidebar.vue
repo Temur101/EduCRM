@@ -75,10 +75,9 @@ const handleLogout = () => {
 <template>
   <aside class="sidebar">
     <div class="sidebar-header">
-      <div class="logo">
-        <div class="logo-icon"></div>
-        <span>EduCRM</span>
-      </div>
+      <router-link to="/" class="logo-link">
+        <img src="../assets/logo.png" alt="EduCRM" class="main-logo" />
+      </router-link>
     </div>
     
     <nav class="sidebar-nav">
@@ -148,26 +147,30 @@ const handleLogout = () => {
 }
 
 .sidebar-header {
-  height: var(--header-height);
+  height: 100px; /* Increased height for logo area */
   display: flex;
   align-items: center;
-  padding: 0 1.5rem;
+  justify-content: center;
+  padding: 1rem;
 }
 
-.logo {
+.logo-link {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--primary);
+  justify-content: center;
+  text-decoration: none;
+  width: 100%;
 }
 
-.logo-icon {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, var(--primary), var(--info));
-  border-radius: 8px;
+.main-logo {
+  height: 65px; /* Slightly larger for better visibility */
+  width: auto;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.main-logo:hover {
+  transform: scale(1.05);
 }
 
 .sidebar-nav {

@@ -10,7 +10,12 @@ import {
   UserPlus,
   Archive,
   Edit,
-  Save
+  Save,
+  Trash2,
+  Loader2,
+  BookOpen,
+  Globe,
+  Zap
 } from 'lucide-vue-next';
 import { ref, reactive, nextTick, onMounted, onUnmounted } from 'vue';
 import draggable from 'vuedraggable';
@@ -137,7 +142,7 @@ const moveLeadToToday = async (lead) => {
       const { data: newBoard, error: createErr } = await supabase
         .from('boards')
         .insert([{ 
-          id: `board-today-${Date.now()}`, 
+          id: crypto.randomUUID(), 
           title: TODAY_BOARD_TITLE, 
           color: '#7366FF',
           created_at: new Date().toISOString()
@@ -151,7 +156,7 @@ const moveLeadToToday = async (lead) => {
     // 2. Create a task based on this lead
     const creationDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const dbTask = {
-      id: `task-today-lead-${Date.now()}`,
+      id: crypto.randomUUID(),
       board_id: todayBoard.id,
       title: lead.name,
       description: `[LEAD_DATA]${JSON.stringify({ 
@@ -347,7 +352,7 @@ const confirmAddLead = async () => {
   if (boardIndex > -1) {
     const randomColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];
     const dbLead = {
-      id: `lead-${Date.now()}`,
+      id: crypto.randomUUID(),
       stage_id: boardId,
       name: newLead.name.trim(),
       phone: newLead.phone.trim(),

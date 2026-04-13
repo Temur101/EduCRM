@@ -5,7 +5,8 @@ defineProps({
   trend: Number,
   icon: [Object, Function, String],
   color: String,
-  total: [String, Number]
+  total: [String, Number],
+  link: String
 })
 </script>
 
@@ -22,7 +23,8 @@ defineProps({
     <div class="stat-body">
       <p class="stat-title">{{ title }}</p>
       <h2 class="stat-value">{{ value }}<span v-if="total" class="stat-total">/{{ total }}</span></h2>
-      <a href="#" class="view-all">{{ $t('dashboard.viewAll') }}</a>
+      <router-link v-if="link" :to="link" class="view-all">{{ $t('dashboard.viewAll') }}</router-link>
+      <span v-else class="view-all-placeholder"></span>
     </div>
   </div>
 </template>

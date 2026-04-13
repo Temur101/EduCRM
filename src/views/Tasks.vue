@@ -314,7 +314,8 @@ const confirmAddTask = async () => {
   const boardId = targetBoardId.value;
   const boardIndex = boards.value.findIndex(b => b.id === boardId);
   if (boardIndex > -1) {
-    const creationDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const locale = localStorage.getItem('userLanguage') === 'uz' ? 'uz-UZ' : 'ru-RU';
+    const creationDate = new Date().toLocaleDateString(locale, { day: '2-digit', month: 'long', year: 'numeric' });
     const dbTask = {
       id: `task-${Date.now()}`,
       board_id: boardId,
@@ -416,7 +417,7 @@ const handleDragChange = async (event, boardId) => {
           :class="['tab', { active: activePriority === p }]"
           @click="activePriority = p"
         >
-          {{ $t('tasks.' + p.toLowerCase()) || p }}
+          {{ p === 'All' ? $t('common.all') : $t('tasks.' + p.toLowerCase()) }}
         </button>
       </div>
 

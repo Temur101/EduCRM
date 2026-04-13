@@ -30,7 +30,9 @@ const groupsCount = ref(0);
 const teachersCount = ref(0);
 const coursesCount = ref(0);
 const roomsCount = ref(0);
+const remindersCount = ref(0);
 const isLoading = ref(true);
+const userLanguage = ref(localStorage.getItem('userLanguage') || 'ru');
 const userRole = ref(localStorage.getItem('userRole') || 'regular');
 
 const recentLeads = ref([]);
@@ -38,111 +40,89 @@ const recentPayments = ref([]);
 
 const loadDashboardData = async () => {
   isLoading.value = true;
+  const userRoleVal = localStorage.getItem('userRole');
+  const teacherId = localStorage.getItem('userTeacherId');
+
   try {
-    const userRole = localStorage.getItem('userRole');
-    const teacherId = localStorage.getItem('userTeacherId');
+    const promises = [];
 
-    // 1. Fetch total leads (Admins only, teachers see 0)
-    if (userRole === 'admin') {
-      const { count: leadCountData, error: leadErr } = await supabase
-        .from('leads')
-        .select('*', { count: 'exact', head: true });
-      if (!leadErr) leadsCount.value = leadCountData || 0;
+    // 1 & 2 & 3. Leads, Tasks, Payments (Admin only)
+    if (userRoleVal === 'admin') {
+      promises.push(
+        supabase.from('leads').select('*', { count: 'exact', head: true }).then(({ count, error }) => {
+          if (!error) leadsCount.value = count || 0;
+        }),
+        supabase.from('tasks').select('*', { count: 'exact', head: true }).then(({ count, error }) => {
+          if (!error) tasksCount.value = count || 0;
+        }),
+        supabase.from('payments').select('amount').eq('status', 'Success').then(({ data, error }) => {
+          if (!error && data) {
+            paymentsTotal.value = data.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+          }
+        }),
+        supabase.from('payment_reminders').select('*', { count: 'exact', head: true }).eq('status', 'Pending').then(({ count, error }) => {
+          if (!error) remindersCount.value = count || 0;
+        })
+      );
+
+      // Today's Tasks requires finding the board ID first, but we can parallelize the rest
+      const todayBoardPromise = supabase.from('boards').select('id').eq('title', 'Today task list').maybeSingle()
+        .then(async ({ data: todayBoard }) => {
+          if (todayBoard) {
+            const { count } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('board_id', todayBoard.id);
+            todayTasksCount.value = count || 0;
+          }
+        });
+      promises.push(todayBoardPromise);
+
+      // Recent leads & payments
+      promises.push(
+        supabase.from('leads').select('*').order('created_at', { ascending: false }).limit(5).then(({ data, error }) => {
+          if (!error) recentLeads.value = data || [];
+        }),
+        supabase.from('payments').select('*').order('created_at', { ascending: false }).limit(5).then(({ data, error }) => {
+          if (!error) recentPayments.value = data || [];
+        }),
+        supabase.from('teachers').select('*', { count: 'exact', head: true }).then(({ count, error }) => {
+          if (!error) teachersCount.value = count || 0;
+        }),
+        supabase.from('courses').select('*', { count: 'exact', head: true }).then(({ count, error }) => {
+          if (!error) coursesCount.value = count || 0;
+        }),
+        supabase.from('rooms').select('*', { count: 'exact', head: true }).then(({ count, error }) => {
+          if (!error) roomsCount.value = count || 0;
+        })
+      );
     }
 
-    // 2. Fetch total tasks (Teachers see 0 for now)
-    if (userRole === 'admin') {
-      const { count: taskCountData, error: taskErr } = await supabase
-        .from('tasks')
-        .select('*', { count: 'exact', head: true });
-      if (!taskErr) tasksCount.value = taskCountData || 0;
-    }
-
-    // 3. Fetch total payments (Admins only)
-    if (userRole === 'admin') {
-      const { data: paymentsData, error: payErr } = await supabase
-        .from('payments')
-        .select('amount');
-      if (!payErr && paymentsData) {
-        paymentsTotal.value = paymentsData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-      }
-    }
-
-    // 4. Fetch Today's Tasks
-    if (userRole === 'admin') {
-      const { data: todayBoard, error: boardErr } = await supabase
-        .from('boards')
-        .select('id')
-        .eq('title', 'Today task list')
-        .maybeSingle();
-      
-      if (todayBoard) {
-        const { count: todayTaskData, error: todayErr } = await supabase
-          .from('tasks')
-          .select('*', { count: 'exact', head: true })
-          .eq('board_id', todayBoard.id);
-        if (!todayErr) todayTasksCount.value = todayTaskData || 0;
-      }
-    }
-
-    // 5. Fetch Recent Leads for the list
-    if (userRole === 'admin') {
-      const { data: recentL, error: rlErr } = await supabase
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (!rlErr) recentLeads.value = recentL || [];
-    }
-
-    // 6. Fetch Recent Payments
-    if (userRole === 'admin') {
-      const { data: recentP, error: rpErr } = await supabase
-        .from('payments')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (!rpErr) recentPayments.value = recentP || [];
-    }
-    
-    // 7. Additional school data
-    let studentsQuery = supabase.from('students').select('*', { count: 'exact', head: true });
-    let groupsQuery = supabase.from('groups').select('*', { count: 'exact', head: true });
-    
-    if (userRole === 'teacher' && teacherId) {
-        // Teacher sees only their own counts
-        groupsQuery = groupsQuery.eq('teacher_id', teacherId);
-        
-        // Count students in teacher's groups
-        const { data: tGroups } = await supabase.from('groups').select('id').eq('teacher_id', teacherId);
-        const tGroupIds = tGroups?.map(g => g.id) || [];
-        if (tGroupIds.length > 0) {
-            studentsQuery = studentsQuery.in('group_id', tGroupIds);
-        } else {
+    // Students & Groups (Context-aware)
+    if (userRoleVal === 'teacher' && teacherId) {
+       const groupsPromise = supabase.from('groups').select('*', { count: 'exact' }).eq('teacher_id', teacherId).then(({ count, data }) => {
+         groupsCount.value = count || 0;
+         return data;
+       });
+       
+       promises.push(groupsPromise.then(async (tGroups) => {
+         const tGroupIds = tGroups?.map(g => g.id) || [];
+         if (tGroupIds.length > 0) {
+            const { count } = await supabase.from('students').select('*', { count: 'exact', head: true }).in('group_id', tGroupIds);
+            studentsCount.value = count || 0;
+         } else {
             studentsCount.value = 0;
-            studentsQuery = null;
-        }
+         }
+       }));
+    } else {
+       promises.push(
+         supabase.from('students').select('*', { count: 'exact', head: true }).then(({ count }) => {
+           studentsCount.value = count || 0;
+         }),
+         supabase.from('groups').select('*', { count: 'exact', head: true }).then(({ count }) => {
+           groupsCount.value = count || 0;
+         })
+       );
     }
 
-    if (studentsQuery) {
-        const { count: sCount } = await studentsQuery;
-        studentsCount.value = sCount || 0;
-    }
-    
-    const { count: gCount } = await groupsQuery;
-    groupsCount.value = gCount || 0;
-
-    if (userRole === 'admin') {
-        const { count: tchCount } = await supabase.from('teachers').select('*', { count: 'exact', head: true });
-        teachersCount.value = tchCount || 0;
-
-        const { count: crsCount } = await supabase.from('courses').select('*', { count: 'exact', head: true });
-        coursesCount.value = crsCount || 0;
-
-        const { count: rmCount } = await supabase.from('rooms').select('*', { count: 'exact', head: true });
-        roomsCount.value = rmCount || 0;
-    }
-
+    await Promise.all(promises);
   } catch (e) {
     console.error('Error loading dashboard:', e);
   } finally {
@@ -163,7 +143,15 @@ const formatCurrency = (val) => {
 };
 
 const getInits = (name) => {
-  return name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'L';
+  if (!name) return '??';
+  return name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  const locale = localStorage.getItem('userLanguage') === 'uz' ? 'uz-UZ' : 'ru-RU';
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 };
 </script>
 
@@ -177,7 +165,7 @@ const getInits = (name) => {
       <div class="header-right">
         <div class="date-badge">
           <Calendar :size="16" />
-          {{ new Date().toLocaleDateString($i18n.locale === 'en' ? 'en-US' : ($i18n.locale === 'ru' ? 'ru-RU' : 'uz-UZ'), { month: 'long', day: 'numeric', year: 'numeric' }) }}
+          {{ new Date().toLocaleDateString(userLanguage === 'uz' ? 'uz-UZ' : 'ru-RU', { month: 'long', day: 'numeric', year: 'numeric' }) }}
         </div>
       </div>
     </div>
@@ -204,6 +192,7 @@ const getInits = (name) => {
           :icon="Users" 
           color="#7366FF"
           :trend="12.5"
+          link="/leads"
         />
         <StatCard 
           :title="$t('dashboard.tasks')" 
@@ -211,6 +200,7 @@ const getInits = (name) => {
           :icon="CheckSquare" 
           color="#FF9F43"
           :trend="8.1"
+          link="/tasks"
         />
         <StatCard 
           :title="$t('dashboard.revenue')" 
@@ -218,6 +208,7 @@ const getInits = (name) => {
           :icon="CreditCard" 
           color="#28C76F"
           :trend="15.2"
+          link="/payments"
         />
         <StatCard 
           :title="$t('dashboard.todayTasks')" 
@@ -225,6 +216,7 @@ const getInits = (name) => {
           :icon="Zap" 
           color="#EA5455"
           :trend="todayTasksCount > 0 ? 100 : 0"
+          link="/today"
         />
       </template>
     </div>
@@ -248,12 +240,14 @@ const getInits = (name) => {
           :value="studentsCount" 
           :icon="GraduationCap" 
           color="#00CFE8"
+          link="/students"
         />
         <StatCard 
           :title="$t('dashboard.totalGroups')" 
           :value="groupsCount" 
           :icon="LayoutGrid" 
           color="#7366FF"
+          link="/groups"
         />
         <StatCard 
           v-if="userRole === 'admin'"
@@ -261,6 +255,7 @@ const getInits = (name) => {
           :value="teachersCount" 
           :icon="Users" 
           color="#FF9F43"
+          link="/teachers"
         />
         <StatCard 
           v-if="userRole === 'admin'"
@@ -268,6 +263,7 @@ const getInits = (name) => {
           :value="coursesCount" 
           :icon="BookOpen" 
           color="#28C76F"
+          link="/courses"
         />
         <StatCard 
           v-if="userRole === 'admin'"
@@ -275,6 +271,15 @@ const getInits = (name) => {
           :value="roomsCount" 
           :icon="DoorOpen" 
           color="#EA5455"
+          link="/rooms"
+        />
+        <StatCard 
+          v-if="userRole === 'admin'"
+          :title="$t('dashboard.pendingReminders')" 
+          :value="remindersCount" 
+          :icon="Clock" 
+          color="#FF9F43"
+          link="/reminders"
         />
       </template>
     </div>
@@ -341,8 +346,8 @@ const getInits = (name) => {
                     <div v-for="pay in recentPayments" :key="pay.id" class="payment-item">
                         <div class="pay-icon"><DollarSign :size="16" /></div>
                         <div class="pay-info">
-                            <p class="pay-student">{{ pay.student_name }}</p>
-                            <p class="pay-date">{{ pay.date }}</p>
+                            <p class="pay-student">{{ pay.student || pay.student_name || '-' }}</p>
+                            <p class="pay-date">{{ formatDate(pay.date) }}</p>
                         </div>
                         <span class="pay-amount">{{ formatCurrency(pay.amount) }}</span>
                     </div>
@@ -423,7 +428,7 @@ const getInits = (name) => {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
 }

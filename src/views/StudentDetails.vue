@@ -24,9 +24,12 @@ import {
   CalendarDays,
   Loader2,
   XCircle,
-  CheckCircle
+  CheckCircle,
+  BellRing,
+  Handshake
 } from 'lucide-vue-next';
 import { supabase } from '../supabase.js';
+import PaymentModal from '../components/PaymentModal.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -35,8 +38,10 @@ const studentId = route.params.id;
 const student = ref(null);
 const group = ref(null);
 const payments = ref([]);
+const paymentReminders = ref([]);
 const attendance = ref([]);
 const isLoading = ref(true);
+const saveError = ref(null);
 
 // Status Modal Logic
 const statusModal = ref({
@@ -55,27 +60,69 @@ const closeStatus = () => {
 };
 
 const loadStudentData = async () => {
+  console.log('Starting simplified loadStudentData for:', studentId);
   isLoading.value = true;
   try {
+    // 1. Fetch basic student data first
     const { data: studentData, error: studentError } = await supabase
       .from('students')
-      .select('*, groups(*, courses(*), teachers(*))')
+      .select('*')
       .eq('id', studentId)
       .single();
-    if (studentError) throw studentError;
+      
+    if (studentError) {
+      console.error('Student fetch error:', studentError);
+      throw studentError;
+    }
+    
     student.value = studentData;
-    group.value = studentData.groups;
     initDiscount(studentData.discount);
 
+    // 2. Fetch group info if exists
+    if (studentData.group_id) {
+      const { data: groupData } = await supabase
+        .from('groups')
+        .select('*, courses(*), teachers(*)')
+        .eq('id', studentData.group_id)
+        .single();
+      group.value = groupData;
+    }
+
+    // 3. Fetch payments (newest first)
     const { data: paymentsData } = await supabase
       .from('payments')
       .select('*')
-      .eq('student', studentData.name.trim())
-      .order('date', { ascending: false });
-    payments.value = paymentsData || [];
+      .eq('student_id', studentId)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    payments.value = (paymentsData || []).map(p => {
+      let cleanComment = p.comment || '';
+      cleanComment = cleanComment.replace(/\[DAYS:[^\]]+\]/g, '').replace(/\[M:[^\]]+\]/g, '').trim();
+      return { ...p, comment: cleanComment };
+    });
+
+    // 4. Fetch payment reminders (promises)
+    const { data: remindersData } = await supabase
+      .from('payment_reminders')
+      .select('*')
+      .eq('student_id', studentId)
+      .neq('status', 'Cancelled');
+
+    paymentReminders.value = (remindersData || []).map(r => {
+      let cleanNote = r.notes || '';
+      cleanNote = cleanNote.replace(/\[DAYS:[^\]]+\]/g, '').replace(/\[M:[^\]]+\]/g, '').trim();
+      
+      // Normalize month to match StudentDetails format: "Month Year" (Uzbek)
+      const d = new Date(r.promised_date);
+      const normalizedMonth = MONTH_NAMES[d.getMonth()] + ' ' + d.getFullYear();
+      
+      return { ...r, notes: cleanNote, normalizedMonth };
+    });
 
   } catch (e) {
-    console.error('Error loading student details:', e.message);
+    console.error('Data loading failed:', e.message);
+    saveError.value = e.message;
   } finally {
     isLoading.value = false;
   }
@@ -94,6 +141,7 @@ const MONTH_NAMES = [
   'Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'
 ];
 const DOW_SHORT = ['Ya','Du','Se','Ch','Pa','Ju','Sh'];
+const DAY_INDEX = { 'Du':1,'Se':2,'Ch':3,'Pa':4,'Ju':5,'Sh':6,'Ya':0 };
 
 const today = new Date();
 const attYear  = ref(today.getFullYear());
@@ -116,22 +164,32 @@ const nextAttMonth = () => {
 
 const loadAttendance = async () => {
   if (!studentId) return;
+  console.log('Starting loadAttendance for:', studentId);
   attLoading.value = true;
   try {
     const y = attYear.value;
     const m = attMonth.value;
     const start = `${y}-${String(m+1).padStart(2,'0')}-01`;
     const end   = `${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
+    
     const { data, error } = await supabase
       .from('attendance')
       .select('lesson_date, status')
       .eq('student_id', studentId)
       .gte('lesson_date', start)
       .lte('lesson_date', end);
-    if (error) { console.warn('attendance table:', error.message); return; }
+      
+    if (error) { 
+      console.warn('Attendance fetch warning:', error.message); 
+      return; 
+    }
+    
     const map = {};
     (data || []).forEach(r => { map[r.lesson_date] = r.status; });
     attMap.value = map;
+    console.log('Attendance loaded:', Object.keys(map).length, 'records');
+  } catch (e) {
+    console.error('Attendance load error:', e);
   } finally {
     attLoading.value = false;
   }
@@ -177,9 +235,21 @@ const getStatusMeta = (key) => STATUSES.find(s => s.key === key) || null;
 
 
 onMounted(() => {
+  console.log('StudentDetails mounted. Initiating loads...');
+  
+  // Safety timeout: if loading takes > 3s, force hide skeleton
+  setTimeout(() => {
+    if (isLoading.value) {
+      console.warn('Safety timeout triggered: forcing isLoading = false');
+      isLoading.value = false;
+      if (!student.value) {
+        saveError.value = 'Сервер не ответил вовремя. Попробуйте обновить страницу.';
+      }
+    }
+  }, 3000);
+
   loadStudentData();
   loadAttendance();
-  loadPayMonthAttendance();
 });
 
 const goBack = () => router.back();
@@ -245,326 +315,122 @@ const saveDiscount = async () => {
   }
 };
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' });
-};
-
-// ══════════════ PAYMENT CALCULATOR ══════════════
-// Day name → JS getDay() index (0=Sun)
-const DAY_INDEX = { 'Du':1,'Se':2,'Ch':3,'Pa':4,'Ju':5,'Sh':6,'Ya':0 };
-
-// Parse group days string like "Se-Pay-Sha" → [2,4,6]
-const groupDayIndexes = computed(() => {
-  const days = group.value?.days || '';
-  return days.split('-').map(d => DAY_INDEX[d.trim().substring(0,2)]).filter(d => d !== undefined);
-});
-
-// State for payment month picker
-const payYear  = ref(today.getFullYear());
-const payMonth = ref(today.getMonth());
-
-// ALL days in payMonth as objects: { dateStr, day, dow, isLesson, beforeJoin }
-const allDaysInPayMonth = computed(() => {
-  const y = payYear.value;
-  const m = payMonth.value;
-  const daysInMonth = new Date(y, m+1, 0).getDate();
-  const joinDateRaw = student.value?.created_at;
-  const joinDate = joinDateRaw ? new Date(joinDateRaw) : null;
-  if (joinDate) joinDate.setHours(0,0,0,0);
-
-  const result = [];
-  for (let d = 1; d <= daysInMonth; d++) {
-    const date = new Date(y, m, d);
-    date.setHours(0,0,0,0);
-    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isLesson = groupDayIndexes.value.includes(date.getDay());
-    const beforeJoin = joinDate ? date < joinDate : false;
-    result.push({ 
-      dateStr, 
-      day: d, 
-      dow: ['Ya','Du','Se','Ch','Pa','Ju','Sh'][date.getDay()], 
-      isLesson,
-      beforeJoin 
-    });
-  }
-  return result;
-});
-
-// Only lesson days — for price per lesson calculation
-const lessonDaysOnly = computed(() => allDaysInPayMonth.value.filter(d => d.isLesson).map(d => d.dateStr));
-
-// Price per lesson = coursePrice / total lesson days in the month
-const pricePerLesson = computed(() => {
-  const total = lessonDaysOnly.value.length;
-  if (!total || !coursePrice.value) return 0;
-  return Math.round(coursePrice.value / total);
-});
-
-const useActualAttendanceForPast = ref(true);
-
-// Is the selected pay month finished (past)?
-const isPastMonth = computed(() => {
-  const now = new Date();
-  return (payYear.value < now.getFullYear()) ||
-    (payYear.value === now.getFullYear() && payMonth.value < now.getMonth());
-});
-
-const isPayMonthFinished = computed(() => {
-  if (!useActualAttendanceForPast.value) return false;
-  return isPastMonth.value;
-});
-
-// For current/future month: manual selection state (Normal or Sick)
-const selectedLessonDays = ref(new Set());
-const sickLessonDays = ref(new Set());
-const countSickDays = ref(false);
-
-// Toggle only paid status (cycle: None <-> Paid)
-const togglePaid = (dateStr) => {
-  const sel = new Set(selectedLessonDays.value);
-  const sck = new Set(sickLessonDays.value);
-  
-  if (sel.has(dateStr)) {
-    sel.delete(dateStr);
-  } else {
-    sel.add(dateStr);
-    sck.delete(dateStr); // clear sick if marking as paid
-  }
-  selectedLessonDays.value = sel;
-  sickLessonDays.value = sck;
-};
-
-// Toggle only sick status (cycle: None <-> Sick)
-const toggleSick = (dateStr) => {
-  const sel = new Set(selectedLessonDays.value);
-  const sck = new Set(sickLessonDays.value);
-  
-  if (sck.has(dateStr)) {
-    sck.delete(dateStr);
-  } else {
-    sck.add(dateStr);
-    sel.delete(dateStr); // clear paid if marking as sick
-  }
-  selectedLessonDays.value = sel;
-  sickLessonDays.value = sck;
-};
-
-// For finished month: actual attendance map
-const payMonthAttMap = ref({});
-const isLoadingPayAtt = ref(false);
-
-const loadPayMonthAttendance = async () => {
-  if (!studentId) return;
-  isLoadingPayAtt.value = true;
-  try {
-    const y = payYear.value;
-    const m = payMonth.value;
-    const start = `${y}-${String(m+1).padStart(2,'0')}-01`;
-    const end   = `${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
-    const { data } = await supabase
-      .from('attendance')
-      .select('lesson_date,status')
-      .eq('student_id', studentId)
-      .gte('lesson_date', start)
-      .lte('lesson_date', end);
-    const map = {};
-    (data||[]).forEach(r => { map[r.lesson_date] = r.status; });
-    payMonthAttMap.value = map;
-  } finally {
-    isLoadingPayAtt.value = false;
-  }
-};
-
-// Attended days = present or late
-const attendedLessonDays = computed(() => {
-  if (!isPayMonthFinished.value) return [];
-  return allDaysInPayMonth.value
-    .filter(d => { 
-      if (d.beforeJoin) return false;
-      const st = payMonthAttMap.value[d.dateStr]; 
-      return st === 'present' || st === 'late'; 
-    })
-    .map(d => d.dateStr);
-});
-
-// Days counted for payment
-const daysForPayment = computed(() => {
-  if (isPayMonthFinished.value) return attendedLessonDays.value;
-
-  // For current/future month: include paid days and optionally sick days
-  return allDaysInPayMonth.value
-    .filter(d => {
-      if (d.beforeJoin) return false;
-      const isPaid = selectedLessonDays.value.has(d.dateStr);
-      const isSick = sickLessonDays.value.has(d.dateStr);
-      return isPaid || (isSick && countSickDays.value);
-    })
-    .map(d => d.dateStr);
-});
-
-// Calculated payment amount
-const calcPayAmount = computed(() => {
-  const base = daysForPayment.value.length * pricePerLesson.value;
-  return Math.max(0, base - discountAmount.value);
-});
-
-const totalPaidInSelectedMonth = computed(() => {
-  const curMonthStr = MONTH_NAMES[payMonth.value] + ' ' + payYear.value;
-  return (payments.value || [])
-    .filter(p => p.month === curMonthStr)
-    .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-});
-
-const monthlyTarget = computed(() => {
-  const target = discount.value > 0 ? priceAfterDiscount.value : (coursePrice.value || 0);
-  const totalLessonDays = lessonDaysOnly.value.length;
-  const validDays = allDaysInPayMonth.value.filter(d => d.isLesson && !d.beforeJoin).length;
-  
-  if (totalLessonDays > 0 && validDays < totalLessonDays) {
-     return validDays * Math.round(target / totalLessonDays);
-  }
-  return target;
-});
-
-const leftToPayInSelectedMonth = computed(() => {
-  return Math.max(0, monthlyTarget.value - totalPaidInSelectedMonth.value);
-});
+const payMonth = computed(() => attMonth.value);
+const payYear = computed(() => attYear.value);
 
 const billingSummary = computed(() => {
-  if (!student.value?.created_at) return [];
+  if (!student.value || !student.value.created_at) return [];
+  
   const joinDate = new Date(student.value.created_at);
   const now = new Date();
-  const summary = [];
   
-  // Find the furthest month with a payment, or the current month
-  let endMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
-  (payments.value || []).forEach(p => {
-    if (!p.month) return;
-    const parts = p.month.split(' '); // "Mart 2026"
-    if (parts.length === 2) {
-      const mIdx = MONTH_NAMES.indexOf(parts[0]);
-      const yVal = parseInt(parts[1]);
-      if (mIdx !== -1 && !isNaN(yVal)) {
-        const d = new Date(yVal, mIdx, 1);
-        if (d > endMonthDate) endMonthDate = d;
+  const summary = [];
+  let curY = joinDate.getFullYear();
+  let curM = joinDate.getMonth();
+  
+  const monthlyPrice = priceAfterDiscount.value || coursePrice.value || 0;
+  
+  // Helper to count lessons in a month based on group days
+  const countLessons = (y, m, fromDate = null) => {
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    let count = 0;
+    const dayIndexes = group.value?.days?.split('-').map(d => DAY_INDEX[d.trim().substring(0,2)]).filter(d => d !== undefined) || [];
+    if (dayIndexes.length === 0) return 12; // Fallback to avg
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(y, m, d);
+      if (fromDate && date < fromDate) continue;
+      if (dayIndexes.includes(date.getDay())) count++;
+    }
+    return count;
+  };
+  
+  while (curY < now.getFullYear() || (curY === now.getFullYear() && curM <= now.getMonth())) {
+    const monthStr = MONTH_NAMES[curM] + ' ' + curY;
+    
+    // Pro-rate the first month (join month)
+    let targetPrice = monthlyPrice;
+    if (curY === joinDate.getFullYear() && curM === joinDate.getMonth()) {
+      const totalLessons = countLessons(curY, curM);
+      const lessonsAfterJoin = countLessons(curY, curM, joinDate);
+      if (totalLessons > 0) {
+        targetPrice = Math.round((lessonsAfterJoin / totalLessons) * monthlyPrice);
       }
     }
-  });
-
-  let currY = joinDate.getFullYear();
-  let currM = joinDate.getMonth();
-  const endY = endMonthDate.getFullYear();
-  const endM = endMonthDate.getMonth();
-
-  while (currY < endY || (currY === endY && currM <= endM)) {
-    const monthStr = MONTH_NAMES[currM] + ' ' + currY;
     
-    const daysInMonth = new Date(currY, currM+1, 0).getDate();
-    let validD = 0; let totalD = 0;
-    if (joinDate) joinDate.setHours(0,0,0,0);
-    
-    for(let d=1; d<=daysInMonth; d++){
-       const dDate = new Date(currY, currM, d);
-       dDate.setHours(0,0,0,0);
-       const isL = groupDayIndexes.value.includes(dDate.getDay());
-       const beforeJoin = joinDate ? dDate < joinDate : false;
-       if(isL){
-          totalD++;
-          if(!beforeJoin) validD++;
-       }
-    }
-    
-    let target = discount.value > 0 ? priceAfterDiscount.value : (coursePrice.value || 0);
-    if (totalD > 0 && validD < totalD) {
-       target = validD * Math.round(target / totalD);
-    }
-    
-    const paid = (payments.value || [])
+    // Calculate how much was paid for this specific month
+    const paidForMonth = payments.value
       .filter(p => (p.month || '').toLowerCase() === monthStr.toLowerCase())
-      .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-    const balance = Math.max(0, target - paid);
-    
+      .reduce((acc, p) => acc + (p.amount || 0), 0);
+      
+    // Calculate how much is promised for this specific month
+    const promisedForMonth = paymentReminders.value
+      .filter(r => r.normalizedMonth.toLowerCase() === monthStr.toLowerCase())
+      .reduce((acc, r) => acc + (r.amount || 0), 0);
+      
     let status = 'unpaid';
-    // Use a small 100 UZS epsilon for "fully paid" to avoid rounding annoyance
-    if (paid >= target - 100 && target > 0) status = 'paid';
-    else if (paid > 0) status = 'partial';
-
-    summary.push({ monthStr, target, paid, balance, status, y: currY, m: currM });
+    const effectivePaid = paidForMonth + promisedForMonth;
+    if (targetPrice > 0 && effectivePaid >= targetPrice - 100) status = 'paid';
+    else if (effectivePaid > 0) status = 'partial';
     
-    if (currM === 11) { currM = 0; currY++; }
-    else currM++;
+    summary.push({
+      monthStr,
+      m: curM,
+      y: curY,
+      paid: paidForMonth,
+      promised: promisedForMonth,
+      target: targetPrice,
+      balance: Math.max(0, targetPrice - effectivePaid),
+      status
+    });
+    
+    if (curM === 11) { curM = 0; curY++; }
+    else curM++;
   }
-  return summary.reverse();
+  
+  return summary.reverse(); // Newest first
 });
 
 const jumpToMonth = (item) => {
-  payYear.value = item.y;
-  payMonth.value = item.m;
-  selectedLessonDays.value = new Set();
-  loadPayMonthAttendance();
-  // Scroll to calculator
-  const calcEl = document.querySelector('.payment-calculator-section');
-  if (calcEl) calcEl.scrollIntoView({ behavior: 'smooth' });
+  attMonth.value = item.m;
+  attYear.value = item.y;
+  loadAttendance();
 };
 
-// Payment form state
-const payMethod = ref('Cash');
-const payAmountOverride = ref(0);
-const payComment = ref('');
-const isSavingPayment = ref(false);
-
-watch(calcPayAmount, (newVal) => {
-  payAmountOverride.value = newVal;
-}, { immediate: true });
-
-const prevPayMonth = async () => {
-  if (payMonth.value === 0) { payMonth.value = 11; payYear.value--; }
-  else payMonth.value--;
-  selectedLessonDays.value = new Set();
-  await loadPayMonthAttendance();
-};
-const nextPayMonth = async () => {
-  if (payMonth.value === 11) { payMonth.value = 0; payYear.value++; }
-  else payMonth.value++;
-  selectedLessonDays.value = new Set();
-  await loadPayMonthAttendance();
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 };
 
-const savePayment = async () => {
-  if (!payAmountOverride.value || !daysForPayment.value.length) return;
-  isSavingPayment.value = true;
-  try {
-    const receiptId = 'PAY-' + Math.floor(Math.random() * 90000 + 10000);
-    const { error } = await supabase.from('payments').insert([{
-      id: 'pay-' + Date.now(),
-      student: student.value.name,
-      course: group.value?.courses?.name || '',
-      amount: payAmountOverride.value,
-      method: payMethod.value,
-      date: new Date().toISOString().slice(0,10),
-      status: 'Success',
-      receipt_id: receiptId,
-      comment: payComment.value,
-      month: MONTH_NAMES[payMonth.value] + ' ' + payYear.value
-    }]);
-    if (error) throw error;
-    // Refresh payments list
-    const { data: newPayments } = await supabase
-      .from('payments').select('*')
-      .eq('student', student.value.name)
-      .order('date', { ascending: false });
-    payments.value = newPayments || [];
-    selectedLessonDays.value = new Set();
-    payComment.value = '';
-    showStatus('Muvaffaqiyatli', `To'lov muvaffaqiyatli saqlandi!\nSumma: ${formatCurrency(payAmountOverride.value)}`, 'success');
-  } catch(e) {
-    console.error(e);
-    showStatus('Xatolik', 'To\'lovni saqlashda xatolik yuz berdi: ' + e.message, 'error');
-  } finally {
-    isSavingPayment.value = false;
-  }
+// --- Modal State ---
+const showPaymentModal = ref(false);
+
+const openPaymentModal = () => {
+  showPaymentModal.value = true;
 };
+
+const closePaymentModal = () => {
+  showPaymentModal.value = false;
+  // Reset overrides after close
+  payMonthOverride.value = null;
+  payYearOverride.value = null;
+};
+
+const payMonthOverride = ref(null);
+const payYearOverride = ref(null);
+
+const openPaymentForMonth = (item) => {
+  payMonthOverride.value = item.m;
+  payYearOverride.value = item.y;
+  showPaymentModal.value = true;
+};
+
+const onPaymentSuccess = () => {
+  loadStudentData();
+  showStatus('Muvaffaqiyatli', 'To\'lov muvaffaqiyatli saqlandi!', 'success');
+};
+
 </script>
 
 <template>
@@ -577,6 +443,10 @@ const savePayment = async () => {
       </button>
       
       <div class="header-actions">
+        <button class="btn-primary" @click="openPaymentModal">
+          <CreditCard :size="18" />
+          {{ $t('students.payNow') }}
+        </button>
         <button class="btn-outline-primary">
           <Edit :size="18" />
           {{ $t('common.edit') }}
@@ -586,28 +456,45 @@ const savePayment = async () => {
 
     <div v-if="isLoading" class="loading-state">
       <div class="skeleton-header skeleton"></div>
+      <div class="debug-info" style="margin-bottom: 1rem; color: #64748b; font-size: 0.8rem;">
+        Загрузка данных для ID: {{ studentId }}...
+      </div>
       <div class="skeleton-grid">
         <div class="skeleton card" style="height: 300px;"></div>
         <div class="skeleton card" style="height: 300px;"></div>
       </div>
     </div>
 
-    <template v-else-if="student">
+    <div v-else-if="saveError" class="error-state card" style="margin: 2rem; padding: 3rem; text-align: center; border-left: 4px solid #EF4444;">
+      <AlertCircle :size="48" style="color: #EF4444; margin-bottom: 1rem;" />
+      <h2 style="margin-bottom: 1rem;">Ошибка загрузки данных</h2>
+      <p style="color: #64748b; margin-bottom: 1.5rem;">{{ saveError }}</p>
+      <button class="btn-primary" @click="loadStudentData">Попробовать снова</button>
+    </div>
+
+    <div v-else-if="!student" class="error-state card" style="margin: 2rem; padding: 3rem; text-align: center;">
+      <XCircle :size="48" style="color: #64748b; margin-bottom: 1rem;" />
+      <h2 style="margin-bottom: 1rem;">Студент не найден</h2>
+      <p style="color: #64748b; margin-bottom: 1.5rem;">Мы не смогли найти ученика с ID: {{ studentId }}</p>
+      <button class="btn-back" @click="goBack">Вернуться назад</button>
+    </div>
+
+    <template v-else>
       <!-- Profile Hero -->
       <div class="profile-hero card">
         <div class="profile-main">
           <div class="avatar-container">
             <img :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(student.name)}&background=7366FF&color=fff&size=128`" class="profile-avatar">
-            <div :class="['status-dot', student.status.toLowerCase()]"></div>
+            <div :class="['status-dot', (student.status || 'Active').toLowerCase()]"></div>
           </div>
         <div class="profile-info">
             <div class="name-row">
               <h1>{{ student.name }}</h1>
-              <span :class="['status-badge', getStatusClass(student.status)]">
-                {{ $t('students.' + student.status.toLowerCase()) }}
+              <span :class="['status-badge', getStatusClass(student.status || 'Active')]">
+                {{ $t('students.' + (student.status || 'Active').toLowerCase()) }}
               </span>
             </div>
-            <p class="student-id">ID: #ST-{{ student.id.slice(0, 8) }}</p>
+            <p class="student-id">ID: #ST-{{ String(student.id || '').slice(0, 8) }}</p>
             
             <div class="quick-stats">
               <div class="q-stat">
@@ -773,12 +660,15 @@ const savePayment = async () => {
                 :key="item.monthStr" 
                 class="billing-month-card" 
                 :class="item.status"
-                @click="jumpToMonth(item)"
+                @click="openPaymentForMonth(item)"
               >
                 <div class="month-main">
                   <div class="month-name-wrap">
                     <span class="month-name">{{ item.monthStr }}</span>
-                    <ArrowRight v-if="payMonth === item.m && payYear === item.y" :size="14" class="current-indicator" />
+                    <button class="btn-jump-month" @click.stop="jumpToMonth(item)" title="Kalendarni o'zgartirish">
+                      <ArrowRight :size="14" />
+                    </button>
+                    <div v-if="payMonth === item.m && payYear === item.y" class="current-indicator-dot" title="Hozirgi ko'rinish"></div>
                   </div>
                   <span class="month-status-badge" :class="item.status">
                     <span class="dot"></span>
@@ -789,6 +679,10 @@ const savePayment = async () => {
                   <div class="m-stat">
                     <span class="m-label">To'langan:</span>
                     <span class="m-val success">{{ formatCurrency(item.paid) }}</span>
+                  </div>
+                  <div class="m-stat" v-if="item.promised > 0">
+                    <span class="m-label">Va'da:</span>
+                    <span class="m-val warning">{{ formatCurrency(item.promised) }}</span>
                   </div>
                   <div class="m-stat" v-if="item.balance > 0">
                     <span class="m-label">Qolgan:</span>
@@ -866,7 +760,7 @@ const savePayment = async () => {
                 </thead>
                 <tbody>
                   <tr v-for="pay in payments" :key="pay.id">
-                    <td>{{ pay.date }}</td>
+                    <td class="whitespace-nowrap">{{ formatDate(pay.date) }}</td>
                     <td class="font-bold">{{ formatCurrency(pay.amount) }}</td>
                     <td><span class="month-badge">{{ pay.month || '-' }}</span></td>
                     <td class="comment-cell">{{ pay.comment || '-' }}</td>
@@ -879,170 +773,9 @@ const savePayment = async () => {
                   </tr>
                 </tbody>
               </table>
-              <div v-else class="no-data-mini">
-                <AlertCircle :size="32" />
+              <div v-else class="no-data-mini" style="margin-top:1rem;">
+                <AlertCircle :size="28" style="opacity:.4" />
                 <p>{{ $t('students.noPaymentHistory') }}</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- ═══ PAYMENT CALCULATOR ═══ -->
-          <div class="pay-calc card">
-            <div class="section-header">
-              <div class="title-row">
-                <CreditCard :size="20" style="color:var(--primary)" />
-                <h3>To'lov qo'shish</h3>
-              </div>
-              <!-- Month navigator -->
-              <div class="att-month-nav">
-                <button class="att-nav-btn" @click="prevPayMonth"><ChevronLeft :size="16" /></button>
-                <span class="att-month-label">{{ MONTH_NAMES[payMonth] }} {{ payYear }}</span>
-                <button class="att-nav-btn" @click="nextPayMonth"><ChevronRight :size="16" /></button>
-              </div>
-            </div>
-
-            <!-- Info bar -->
-            <div class="pay-info-bar">
-              <div class="pay-info-item">
-                <span class="pay-info-label">Dars kunlari</span>
-                <span class="pay-info-val">{{ lessonDaysOnly.length }} kun</span>
-              </div>
-              <div class="pay-info-item">
-                <span class="pay-info-label">Kun narxi</span>
-                <span class="pay-info-val">{{ formatCurrency(pricePerLesson) }}</span>
-              </div>
-              <div class="pay-info-item">
-                <span class="pay-info-label">Tanlangan</span>
-                <span class="pay-info-val primary">{{ daysForPayment.length }} kun</span>
-              </div>
-              <div class="pay-info-item">
-                <span class="pay-info-label">Chegirma</span>
-                <span class="pay-info-val danger">{{ discount > 0 ? '− ' + formatCurrency(discountAmount) : 'Yo\'q' }}</span>
-              </div>
-              <div class="pay-info-item highlight">
-                <div class="balance-breakdown">
-                  <div class="bb-item">
-                    <span class="bb-label">Oylik to'lov:</span>
-                    <span class="bb-val">{{ formatCurrency(monthlyTarget) }}</span>
-                  </div>
-                  <div class="bb-item">
-                    <span class="bb-label">To'langan:</span>
-                    <span class="bb-val success-text">{{ formatCurrency(totalPaidInSelectedMonth) }}</span>
-                  </div>
-                  <div class="bb-item total">
-                    <span class="bb-label">Qolgan:</span>
-                    <span class="bb-val" :class="leftToPayInSelectedMonth > 0 ? 'warning-text' : 'success-text'">
-                      {{ formatCurrency(leftToPayInSelectedMonth) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Finished month: show actual attendance -->
-            <template v-if="isPayMonthFinished">
-              <div class="pay-month-note finished" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>🗓️ Oy tugagan — haqiqiy davomatga qarab hisoblanmoqda</span>
-                <button class="pc-sel-btn" @click="useActualAttendanceForPast = false" style="background: white; border-color: #FCD34D; color: #92400E;">Qo'lda kiritish</button>
-              </div>
-              <div v-if="isLoadingPayAtt" class="att-loading"><Loader2 :size="18" class="spin"/> Yuklanmoqda...</div>
-              <div v-else class="pc-day-grid">
-                <div
-                  v-for="d in allDaysInPayMonth" :key="d.dateStr"
-                  class="pc-day-chip"
-                  :class="{
-                    'pc-chip-lesson':   d.isLesson && !d.beforeJoin && !payMonthAttMap[d.dateStr],
-                    'pc-chip-present':  payMonthAttMap[d.dateStr] === 'present' || payMonthAttMap[d.dateStr] === 'late',
-                    'pc-chip-absent':   payMonthAttMap[d.dateStr] === 'absent'  || payMonthAttMap[d.dateStr] === 'sick',
-                    'pc-chip-none':     (!d.isLesson || d.beforeJoin) && !payMonthAttMap[d.dateStr],
-                    'pc-chip-before-join': d.beforeJoin
-                  }"
-                >
-                  {{ d.day }}
-                  <span class="pc-day-dow">{{ d.dow }}</span>
-                </div>
-              </div>
-            </template>
-
-            <!-- Current / future month: manual selection -->
-            <template v-else>
-              <div class="pay-month-note" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>📌 O'quvchi qaysi kunlari kelishini belgilang</span>
-                <button v-if="isPastMonth" class="pc-sel-btn" @click="useActualAttendanceForPast = true" style="background: white;">Davomat asosida</button>
-              </div>
-              <div class="pc-day-grid">
-                <button
-                  v-for="d in allDaysInPayMonth" :key="d.dateStr"
-                  class="pc-day-chip"
-                  :class="{
-                    'pc-chip-selected': selectedLessonDays.has(d.dateStr) && !d.beforeJoin,
-                    'pc-chip-sick':     sickLessonDays.has(d.dateStr) && !d.beforeJoin,
-                    'pc-chip-lesson':   d.isLesson && !d.beforeJoin && !selectedLessonDays.has(d.dateStr) && !sickLessonDays.has(d.dateStr),
-                    'pc-chip-past':     new Date(d.dateStr) < today && !d.beforeJoin,
-                    'pc-chip-before-join': d.beforeJoin
-                  }"
-                  :disabled="d.beforeJoin"
-                  @click="togglePaid(d.dateStr)"
-                  @contextmenu.prevent="toggleSick(d.dateStr)"
-                  :title="d.beforeJoin ? 'O\'quvchi hali qo\'shilmagan' : (selectedLessonDays.has(d.dateStr) ? 'To\'lov (o\'ng tugma: Kasal)' : 'Kasal (o\'ng tugma)')"
-                >
-                  <span
-                    class="pc-sick-label clickable"
-                    :class="{ 'active': sickLessonDays.has(d.dateStr) }"
-                    @click.stop="toggleSick(d.dateStr)"
-                  >⚕</span>
-                  {{ d.day }}
-                  <span class="pc-day-dow">{{ d.dow }}</span>
-                </button>
-              </div>
-              <div class="pc-select-actions">
-                <div class="pc-main-actions">
-                  <button class="pc-sel-btn" @click="selectedLessonDays = new Set(allDaysInPayMonth.filter(d => !d.beforeJoin).map(d => d.dateStr)); sickLessonDays = new Set()">Barchasini tanlash</button>
-                  <button class="pc-sel-btn" @click="selectedLessonDays = new Set(allDaysInPayMonth.filter(d => d.isLesson && !d.beforeJoin).map(d => d.dateStr)); sickLessonDays = new Set()">Dars kunlari</button>
-                  <button class="pc-sel-btn" @click="selectedLessonDays = new Set(); sickLessonDays = new Set()">Tozalash</button>
-                  <button class="pc-sel-btn" @click="selectedLessonDays = new Set(allDaysInPayMonth.filter(d => [2,4,6].includes(new Date(d.dateStr + 'T00:00:00').getDay())).map(d => d.dateStr)); sickLessonDays = new Set()">Se | Pa | Sh</button>
-                  <button class="pc-sel-btn" @click="selectedLessonDays = new Set(allDaysInPayMonth.filter(d => [1,3,5].includes(new Date(d.dateStr + 'T00:00:00').getDay())).map(d => d.dateStr)); sickLessonDays = new Set()">Du | Ch | Ju</button>
-                </div>
-                <!-- Sick days toggle -->
-                <div class="pc-sick-toggle">
-                  <label class="toggle-cb">
-                    <input type="checkbox" v-model="countSickDays">
-                    <span class="cb-label">⚕ Kasal kunlarini hisoblash</span>
-                  </label>
-                </div>
-              </div>
-            </template>
-
-            <!-- Summary & Save -->
-            <div class="pay-summary">
-              <div class="pay-summary-calc">
-                <span>{{ daysForPayment.length }} kun × {{ formatCurrency(pricePerLesson) }}</span>
-                <span v-if="discount > 0"> − {{ formatCurrency(discountAmount) }}</span>
-                <span class="pay-summary-eq"> = 
-                  <div class="pay-edit-wrap">
-                    <span class="pay-edit-currency">UZS</span>
-                    <input type="number" v-model.number="payAmountOverride" class="pay-edit-input" />
-                  </div>
-                </span>
-              </div>
-              <div class="pay-form-row">
-                <div class="pay-comment-wrap">
-                  <input v-model="payComment" class="pay-comment-input" :placeholder="$t('students.comment') + '...'" />
-                </div>
-                <select v-model="payMethod" class="pay-method-select">
-                  <option value="Cash">Naqd pul</option>
-                  <option value="Card">Karta</option>
-                  <option value="Transfer">O'tkazma</option>
-                </select>
-                <button
-                  class="btn-pay-save"
-                  :disabled="!calcPayAmount || !daysForPayment.length || isSavingPayment"
-                  @click="savePayment"
-                >
-                  <Loader2 v-if="isSavingPayment" :size="16" class="spin" />
-                  <CreditCard v-else :size="16" />
-                  To'lov saqlash
-                </button>
               </div>
             </div>
           </div>
@@ -1053,7 +786,7 @@ const savePayment = async () => {
             <div class="section-header">
               <div class="title-row">
                 <CalendarDays :size="20" class="att-icon-color" />
-                <h3>Davomat</h3>
+                <h3>{{ $t('students.attendance') }}</h3>
               </div>
               <!-- Month nav -->
               <div class="att-month-nav">
@@ -1158,6 +891,18 @@ const savePayment = async () => {
         </div>
       </div>
     </transition>
+
+    <!-- Payment Modal -->
+    <PaymentModal 
+      :show="showPaymentModal"
+      :initial-student-id="student?.id"
+      :initial-student-name="student?.name"
+      :initial-group-id="student?.group_id"
+      :month_override="payMonthOverride"
+      :year_override="payYearOverride"
+      @close="closePaymentModal"
+      @success="onPaymentSuccess"
+    />
   </div>
 </template>
 
@@ -2327,6 +2072,34 @@ td {
 .month-status-badge.unpaid { background: #FEE2E2; color: #991B1B; }
 .month-status-badge.unpaid .dot { background: #EF4444; }
 
+.btn-jump-month {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+  background: white;
+  color: #94A3B8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+.btn-jump-month:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #F0EEFF;
+}
+
+.current-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary);
+}
+
 .month-details {
   display: flex;
   gap: 1.5rem;
@@ -2459,4 +2232,330 @@ td {
 
 .modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
+
+/* ═══ VA'DA TO'LOV STYLES ═══ */
+.vada-card { padding: 1.5rem; }
+
+.vada-form {
+  background: #FAFBFF;
+  border: 1px solid #E8E6FF;
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.vada-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+}
+
+.vada-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.vada-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.vada-req { color: #EF4444; }
+
+.vada-input {
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  background: white;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.vada-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(127,119,221,0.12);
+}
+
+.vada-input-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.vada-prefix {
+  position: absolute;
+  left: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94A3B8;
+  pointer-events: none;
+}
+.vada-amount { padding-left: 2.75rem !important; }
+
+.btn-vada-save {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #7F77DD, #6366F1);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  margin-top: 0.25rem;
+}
+.btn-vada-save:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(127,119,221,0.35);
+}
+.btn-vada-save:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.vada-list {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.vada-list-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+}
+
+.vada-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 1px solid #F1F5F9;
+  border-radius: 12px;
+  transition: border-color 0.2s;
+}
+.vada-item:hover { border-color: #C7D2FE; }
+
+.vada-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+.vada-item-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.vada-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.vada-date {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #334155;
+}
+.vada-note {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.vada-amount-chip {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #4F46E5;
+  background: #EEF2FF;
+  padding: 3px 10px;
+  border-radius: 8px;
+}
+
+/* Status badge colors — 3 colors only */
+.vada-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 4px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.promise-green  { background: #DCFCE7; color: #166534; }
+.promise-yellow { background: #FEF9C3; color: #854D0E; }
+.promise-red    { background: #FEE2E2; color: #991B1B; }
+
+.vada-btn-paid {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: #DCFCE7;
+  color: #16a34a;
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.vada-btn-paid:hover { background: #16a34a; color: white; }
+
+.vada-btn-del {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: transparent;
+  color: #CBD5E1;
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.vada-btn-del:hover { background: #FEE2E2; color: #EF4444; }
+
+/* ═══ PAY / PROMISE MODE TOGGLE ═══ */
+.pay-mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0 0.75rem;
+  background: #F1F5F9;
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.pay-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.65rem 1rem;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: #64748B;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.pay-mode-btn.active {
+  background: white;
+  color: var(--dark);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.pay-mode-btn.promise.active {
+  background: white;
+  color: #7C3AED;
+}
+.pay-mode-btn:hover:not(.active) {
+  color: var(--dark);
+  background: rgba(255,255,255,0.6);
+}
+
+/* Promise mode form inside pay-calc */
+.promise-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.promise-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.promise-field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.promise-mini-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.promise-mini-input {
+  padding: 0.6rem 0.85rem;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  background: white;
+  font-size: 0.88rem;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.promise-mini-input:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+}
+
+.promise-amount-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F3E8FF;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+.pap-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #6D28D9;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.pap-val {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #5B21B6;
+}
+
+.btn-promise-save {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #7C3AED, #6D28D9);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.8rem 1.5rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-promise-save:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(124,58,237,0.35);
+}
+.btn-promise-save:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

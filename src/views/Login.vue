@@ -115,10 +115,7 @@ const handleLogin = async () => {
       <div class="login-card card">
         <div class="login-header">
           <div class="brand">
-            <div class="logo-box">
-              <span class="logo-icon">E</span>
-            </div>
-            <h1>EduCRM</h1>
+            <img src="../assets/logo.png" alt="EduCRM" class="login-logo" />
           </div>
           <p class="subtitle">{{ $t('login.welcome') }}</p>
         </div>
@@ -232,33 +229,13 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
-.logo-box {
-  width: 42px;
-  height: 42px;
-  background: var(--primary);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 16px rgba(115, 102, 255, 0.25);
-}
-
-.logo-icon {
-  color: white;
-  font-weight: 800;
-  font-size: 1.25rem;
-}
-
-.brand h1 {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: var(--dark);
-  margin: 0;
-  letter-spacing: -0.5px;
+.login-logo {
+  height: 80px;
+  width: auto;
+  object-fit: contain;
 }
 
 .subtitle {

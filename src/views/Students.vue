@@ -17,11 +17,14 @@ import {
   ChevronRight,
   AlertTriangle,
   Mail,
-  Eye
+  Eye,
+  CreditCard
 } from 'lucide-vue-next';
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { supabase } from '../supabase.js';
+import PaymentModal from '../components/PaymentModal.vue';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
 const userRole = ref(localStorage.getItem('userRole') || 'regular');
@@ -179,6 +182,8 @@ const goToGroup = (id) => {
 
 // --- Modal State ---
 const showModal = ref(false);
+const showPaymentModal = ref(false);
+const selectedStudentForPayment = ref(null);
 const isEditing = ref(false);
 const editingId = ref(null);
 
@@ -217,6 +222,20 @@ const openEditModal = (student) => {
 
 const closeModal = () => {
   showModal.value = false;
+};
+
+const openPaymentModal = (student) => {
+  selectedStudentForPayment.value = student;
+  showPaymentModal.value = true;
+};
+
+const closePaymentModal = () => {
+  showPaymentModal.value = false;
+  selectedStudentForPayment.value = null;
+};
+
+const onPaymentSuccess = () => {
+  loadData();
 };
 
 const submitForm = async () => {
@@ -386,6 +405,9 @@ const formatDate = (dateStr) => {
                     <button class="btn-view-action" @click="goToStudentDetail(item.id)">
                       <Eye :size="20" />
                     </button>
+                    <button class="btn-view-action payment-btn" @click="openPaymentModal(item)">
+                      <CreditCard :size="20" />
+                    </button>
                     <div class="dropdown-wrapper" v-if="userRole === 'admin'">
                     <button 
                       class="btn-icon-more" 
@@ -538,6 +560,15 @@ const formatDate = (dateStr) => {
         </div>
       </div>
     </transition>
+    <!-- Payment Modal -->
+    <PaymentModal 
+      :show="showPaymentModal"
+      :initial-student-id="selectedStudentForPayment?.id"
+      :initial-student-name="selectedStudentForPayment?.name"
+      :initial-group-id="selectedStudentForPayment?.group_id"
+      @close="closePaymentModal"
+      @success="onPaymentSuccess"
+    />
   </div>
 </template>
 
@@ -628,6 +659,8 @@ td { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
 .text-right { text-align: right; }
 .btn-view-action { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--primary); background: var(--primary-light); transition: all 0.2s; border: none; cursor: pointer; }
 .btn-view-action:hover { background: var(--primary); color: white; transform: scale(1.05); }
+.btn-view-action.payment-btn { background: #F3E8FF; color: #7C3AED; border: 1.5px solid #E9D5FF; }
+.btn-view-action.payment-btn:hover { background: #7C3AED; color: white; border-color: #7C3AED; }
 
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 10000; backdrop-filter: blur(4px); }
 .modal-box { background: white; border-radius: 20px; width: 100%; max-width: 600px; overflow: hidden; }

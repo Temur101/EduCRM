@@ -1,11 +1,11 @@
 <script setup>
 import { 
-  Plus, 
+  Plus,
+  CreditCard,
   Search, 
   Download, 
   Filter, 
   MoreVertical, 
-  CreditCard, 
   DollarSign, 
   Clock, 
   CheckCircle2,
@@ -19,6 +19,9 @@ import {
 } from 'lucide-vue-next';
 import { ref, reactive, computed, onMounted } from 'vue';
 import { supabase } from '../supabase.js';
+import PaymentModal from '../components/PaymentModal.vue';
+
+const showModal = ref(false);
 
 // --- Sample Data ---
 const payments = ref([]);
@@ -45,29 +48,51 @@ const closeDropdowns = () => {
 const loadData = async () => {
   isLoading.value = true;
   try {
-    const { data, error } = await supabase
+    // 1. Fetch payments (newest first)
+    const { data: pData, error: pError } = await supabase
       .from('payments')
       .select('*')
-      .order('date', { ascending: false });
-    if (error) throw error;
-    payments.value = data.map(p => ({
-      id: p.id,
-      student: p.student,
-      course: p.course,
-      amount: p.amount,
-      method: p.method,
-      date: p.date,
-      status: p.status,
-      receiptId: p.receipt_id,
-      comment: p.comment,
-      month: p.month
-    }));
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false }); // Secondary sort to be sure
+      
+    if (pError) throw pError;
+    
+    payments.value = (pData || []).map(p => {
+      // Clean comment from technical tags [DAYS:...] and [M:...]
+      let cleanComment = p.comment || '';
+      cleanComment = cleanComment.replace(/\[DAYS:[^\]]+\]/g, '').replace(/\[M:[^\]]+\]/g, '').trim();
+
+      return {
+        id: p.id,
+        student: p.student,
+        student_id: p.student_id,
+        course: p.course,
+        amount: p.amount,
+        method: p.method,
+        date: p.date,
+        status: p.status,
+        receiptId: p.receipt_id,
+        comment: cleanComment,
+        month: p.month
+      };
+    });
+
+    // 2. Fetch pending reminders count
+    const { count, error: cError } = await supabase
+      .from('payment_reminders')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'Pending');
+    
+    if (!cError) remindersCount.value = count || 0;
+
   } catch (e) {
     console.error('Error loading payments:', e);
   } finally {
     isLoading.value = false;
   }
 };
+
+const remindersCount = ref(0);
 
 onMounted(() => {
   document.addEventListener('click', closeDropdowns);
@@ -122,66 +147,18 @@ const totalRevenue = computed(() => payments.value.reduce((acc, p) => acc + p.am
 const successCount = computed(() => payments.value.filter(p => p.status === 'Success').length);
 const pendingCount = computed(() => payments.value.filter(p => p.status === 'Pending').length);
 
-// --- State for Add Payment Modal ---
-const showModal = ref(false);
-const newPayment = reactive({
-  student: '',
-  course: '',
-  amount: '',
-  method: 'Cash',
-  date: new Date().toISOString().split('T')[0],
-  status: 'Success'
-});
-
 const openModal = () => {
-  newPayment.student = '';
-  newPayment.course = '';
-  newPayment.amount = '';
-  newPayment.method = 'Cash';
-  newPayment.date = new Date().toISOString().split('T')[0];
-  newPayment.status = 'Success';
   showModal.value = true;
 };
 
-const closeModal = () => showModal.value = false;
-
-const addPayment = async () => {
-  if (!newPayment.student || !newPayment.amount || isSubmitting.value) return;
-  
-  isSubmitting.value = true;
-  const dbPayment = {
-    id: `pay-${Date.now()}`,
-    student: newPayment.student,
-    course: newPayment.course || 'Other',
-    amount: Number(newPayment.amount),
-    method: newPayment.method,
-    date: newPayment.date,
-    status: newPayment.status,
-    receipt_id: 'PAY-' + Math.floor(1000 + Math.random() * 9000)
-  };
-
-  try {
-    const { error } = await supabase.from('payments').insert([dbPayment]);
-    if (error) throw error;
-    
-    payments.value.unshift({
-      id: dbPayment.id,
-      student: dbPayment.student,
-      course: dbPayment.course,
-      amount: dbPayment.amount,
-      method: dbPayment.method,
-      date: dbPayment.date,
-      status: dbPayment.status,
-      receiptId: dbPayment.receipt_id
-    });
-    
-    closeModal();
-  } catch (e) {
-    console.error('Error adding payment:', e);
-  } finally {
-    isSubmitting.value = false;
-  }
+const closeModal = () => {
+  showModal.value = false;
 };
+
+const onPaymentSuccess = () => {
+  loadData();
+};
+
 
 const deletePayment = async (id) => {
   if (deletingPaymentId.value) return;
@@ -210,6 +187,54 @@ const formatCurrency = (val) => {
   return new Intl.NumberFormat('uz-UZ', { style: 'currency', currency: 'UZS', maximumFractionDigits: 0 }).format(val);
 };
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  const locale = localStorage.getItem('userLanguage') === 'uz' ? 'uz-UZ' : 'ru-RU';
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+};
+
+const handleExport = () => {
+  if (payments.value.length === 0) return;
+  
+  const headers = [
+    t('payments.studentColumn'),
+    t('payments.monthColumn'),
+    t('payments.commentColumn'),
+    t('payments.receiptColumn'),
+    t('payments.amountColumn'),
+    t('payments.methodColumn'),
+    t('payments.dateColumn'),
+    t('payments.statusColumn')
+  ];
+  
+  const rows = payments.value.map(p => [
+    p.student_name || p.student,
+    p.month || '-',
+    p.notes || '',
+    p.receipt_id,
+    p.amount,
+    p.method,
+    p.date,
+    p.status
+  ]);
+  
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(r => r.join(','))
+  ].join('\n');
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `payments_export_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 const getStatusClass = (status) => {
   return status === 'Success' ? 'status-success' : 'status-pending';
 };
@@ -234,8 +259,8 @@ const getMethodIcon = (method) => {
         <p>{{ $t('payments.subtitle') }}</p>
       </div>
       <button class="btn-primary" @click="openModal">
-        <Plus :size="20" /> 
-        {{ $t('payments.addNew') }}
+        <CreditCard :size="20" /> 
+        {{ $t('students.payNow') }}
       </button>
     </div>
 
@@ -300,9 +325,9 @@ const getMethodIcon = (method) => {
             <Clock :size="24" />
           </div>
           <div class="stat-info">
-            <span class="stat-label">{{ $t('payments.pending') }}</span>
-            <h2 class="stat-value">{{ pendingCount }}</h2>
-            <span class="stat-subtext">{{ $t('payments.attention') }}</span>
+            <span class="stat-label">{{ $t('payments.expected') }}</span>
+            <h2 class="stat-value">{{ remindersCount }}</h2>
+            <span class="stat-subtext">{{ $t('payments.activeReminders') }}</span>
           </div>
         </template>
       </div>
@@ -335,7 +360,7 @@ const getMethodIcon = (method) => {
               <X :size="14" />
             </button>
           </div>
-          <button class="btn-outline"><Download :size="16" /> {{ $t('common.export') }}</button>
+          <button class="btn-outline" @click="handleExport"><Download :size="16" /> {{ $t('common.export') }}</button>
         </div>
       </div>
 
@@ -389,7 +414,7 @@ const getMethodIcon = (method) => {
                 </div>
               </td>
               <td class="table-month-cell"><span class="month-label">{{ item.month || '-' }}</span></td>
-              <td class="table-comment-cell">{{ item.comment || '-' }}</td>
+              <td class="table-comment-cell">{{ (item.comment || '').replace(/\[M:[^\]]+\]/g, '').replace(/\[DAYS:[^\]]+\]/g, '').trim() || '' }}</td>
               <td><code>{{ item.receiptId }}</code></td>
               <td><span class="amount">{{ formatCurrency(item.amount) }}</span></td>
               <td>
@@ -398,7 +423,7 @@ const getMethodIcon = (method) => {
                   {{ $t('payments.method' + item.method) }}
                 </div>
               </td>
-              <td>{{ item.date }}</td>
+              <td class="table-date-cell">{{ formatDate(item.date) }}</td>
               <td>
                 <span :class="['status-badge', getStatusClass(item.status)]">
                   {{ item.status }}
@@ -456,65 +481,11 @@ const getMethodIcon = (method) => {
     </div>
 
     <!-- Add Payment Modal -->
-    <transition name="modal">
-      <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-        <div class="modal-box">
-          <div class="modal-header">
-            <div class="modal-title-row">
-              <div class="modal-icon"><CreditCard :size="22" /></div>
-              <h2>{{ $t('payments.addModalTitle') }}</h2>
-            </div>
-            <button class="btn-icon" @click="closeModal"><X :size="20" /></button>
-          </div>
-
-          <div class="modal-body">
-            <div class="form-group">
-              <label><User :size="14" /> {{ $t('payments.studentName') }} <span class="required">*</span></label>
-              <input v-model="newPayment.student" :placeholder="$t('payments.studentPlaceholder')" />
-            </div>
-
-            <div class="form-group">
-              <label><FileText :size="14" /> {{ $t('payments.courseLabel') }}</label>
-              <input v-model="newPayment.course" :placeholder="$t('payments.coursePlaceholder')" />
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label><DollarSign :size="14" /> {{ $t('payments.amountLabel') }} <span class="required">*</span></label>
-                <input v-model="newPayment.amount" type="number" :placeholder="$t('payments.amountPlaceholder')" />
-              </div>
-              <div class="form-group">
-                <label><Wallet :size="14" /> {{ $t('payments.methodLabel') }}</label>
-                <select v-model="newPayment.method">
-                  <option value="Cash">{{ $t('payments.methodCash') }}</option>
-                  <option value="Card">{{ $t('payments.methodCard') }}</option>
-                  <option value="Click">{{ $t('payments.methodClick') }}</option>
-                  <option value="Payme">{{ $t('payments.methodPayme') }}</option>
-                  <option value="Transfer">{{ $t('payments.methodTransfer') }}</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label><Calendar :size="14" /> {{ $t('payments.dateLabel') }}</label>
-                <input v-model="newPayment.date" type="date" />
-              </div>
-            </div>
-          </div>
-
-          <div class="modal-footer">
-            <button class="btn-cancel-modal" @click="closeModal" :disabled="isSubmitting">{{ $t('common.cancel') }}</button>
-            <button class="btn-confirm-payment" @click="addPayment" :disabled="!newPayment.student || !newPayment.amount || isSubmitting">
-              <template v-if="isSubmitting">
-                <Loader2 :size="16" class="spin" /> {{ $t('common.loading') }}
-              </template>
-              <template v-else>{{ $t('payments.confirmBtn') }}</template>
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
+    <PaymentModal 
+      :show="showModal"
+      @close="closeModal"
+      @success="onPaymentSuccess"
+    />
   </div>
 </template>
 
@@ -774,8 +745,8 @@ th {
 }
 
 td {
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border);
+  padding: 1.1rem 1.5rem;
+  border-bottom: 1px solid #F1F5F9;
   vertical-align: middle;
 }
 
@@ -786,16 +757,19 @@ td {
 }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   background: var(--primary-light);
   color: var(--primary);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 0.85rem;
+  font-weight: 800;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .details {
@@ -843,13 +817,16 @@ td {
 }
 
 .month-label {
-  background: #F0F4FF;
-  color: #5A67D8;
-  padding: 0.3rem 0.6rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  border: 1px solid #E0E7FF;
+  background: #EEF2FF;
+  color: #4F46E5;
+  padding: 0.4rem 0.8rem;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border: 1.5px solid #E0E7FF;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .table-comment-cell {
@@ -1091,5 +1068,11 @@ td {
 @keyframes skeleton-loading {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+.table-date-cell {
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--gray);
+  min-width: 90px;
 }
 </style>

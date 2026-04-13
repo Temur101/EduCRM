@@ -21,7 +21,10 @@ import {
   BookOpen
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, reactive } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { supabase } from '../supabase.js';
+
+const { t } = useI18n();
 
 const archivedItems = ref([]);
 const isLoading = ref(true);
@@ -143,9 +146,12 @@ const getItemTitle = (item) => {
 };
 
 const formatDate = (dateStr) => {
-  return new Date(dateStr).toLocaleString('en-GB', {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  const locale = localStorage.getItem('userLanguage') === 'uz' ? 'uz-UZ' : 'ru-RU';
+  return date.toLocaleString(locale, {
     day: '2-digit',
-    month: 'short',
+    month: 'long',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
@@ -184,10 +190,10 @@ const restoreItem = async (item) => {
     
     archivedItems.value = archivedItems.value.filter(i => i.id !== item.id);
     closeDetails();
-    showStatus('success', 'Muvaffaqiyatli!', `${item.type.charAt(0).toUpperCase() + item.type.slice(1)} muvaffaqiyatli tiklandi.`);
+    showStatus('success', t('common.success'), t('archive.restoreSuccess', { type: t('archive.' + item.type) }));
   } catch (e) {
     console.error('Error restoring:', e);
-    showStatus('error', 'Xatolik', 'Elementni tiklashda xatolik yuz berdi.');
+    showStatus('error', t('common.error'), t('archive.restoreFail'));
   } finally {
     restoringId.value = null;
   }
@@ -207,10 +213,10 @@ const permanentDelete = async () => {
     if (error) throw error;
     archivedItems.value = archivedItems.value.filter(i => i.id !== itemToDeleteId.value);
     showDeleteModal.value = false;
-    showStatus('success', 'O\'chirildi', 'Element butunlay o\'chirib tashlandi.');
+    showStatus('success', t('common.delete'), t('common.success'));
   } catch (e) {
     console.error('Error deleting:', e);
-    showStatus('error', 'Xatolik', 'O\'chirishda xatolik yuz berdi.');
+    showStatus('error', t('common.error'), t('common.error'));
   } finally {
     isDeletingPermanently.value = false;
     itemToDeleteId.value = null;
@@ -242,7 +248,7 @@ const permanentDelete = async () => {
           :class="['tab', { active: activeFilter === t }]"
           @click="activeFilter = t"
         >
-          {{ $t('archive.' + t.toLowerCase()) }}
+          {{ t === 'All' ? $t('common.all') : $t('archive.' + t.toLowerCase()) }}
         </button>
       </div>
     </div>
