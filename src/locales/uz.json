@@ -46,6 +46,8 @@
     },
     "leads": {
         "title": "Lidlar",
+        "newLeadModalTitle": "Yangi lid qo'shish",
+        "namePlaceholder": "masalan, Ali Toshmatov",
         "searchPlaceholder": "Lidlarni qidirish...",
         "noItems": "Lidlar topilmadi",
         "addStage": "Etap qo'shish",
