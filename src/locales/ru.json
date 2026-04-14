@@ -46,6 +46,8 @@
     },
     "leads": {
         "title": "Лиды",
+        "newLeadModalTitle": "Добавить нового лида",
+        "namePlaceholder": "например, Иван Иванов",
         "searchPlaceholder": "Поиск лидов...",
         "noItems": "Лиды не найдены",
         "addStage": "Добавить этап",

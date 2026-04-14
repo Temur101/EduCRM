@@ -48,6 +48,8 @@ const loadData = async () => {
 
     const { data: leadsData, error: leadsErr } = await supabase.from('leads').select('*');
     if (leadsErr) throw leadsErr;
+    
+    await fetchCourses();
 
     boards.value = stagesData.map(s => ({
       id: s.id,
@@ -206,16 +208,25 @@ const getPriorityColor = (p) => {
   }
 };
 const sources = ['Website', 'Referral', 'Cold Call', 'Social Media', 'Event', 'Other'];
-const courses = [
-  { label: 'English', icon: '🇬🇧' },
-  { label: 'IT / Programming', icon: '💻' },
-  { label: 'Mathematics', icon: '📐' },
-  { label: 'Russian', icon: '🇷🇺' },
-  { label: 'Chinese', icon: '🇨🇳' },
-  { label: 'Design', icon: '🎨' },
-  { label: 'Marketing', icon: '📣' },
-  { label: 'Other', icon: '📚' },
-];
+const courses = ref([]);
+const fetchCourses = async () => {
+  try {
+    const { data, error } = await supabase.from('courses').select('name');
+    if (error) throw error;
+    courses.value = (data || []).map(c => ({
+      label: c.name,
+      icon: '📚'
+    }));
+    if (courses.value.length === 0) {
+      courses.value = [{ label: 'Other', icon: '📚' }];
+    } else if (!courses.value.some(c => c.label === 'Other')) {
+       courses.value.push({ label: 'Other', icon: '📚' });
+    }
+  } catch (e) {
+    console.error('Error fetching courses:', e);
+    courses.value = [{ label: 'Other', icon: '📚' }];
+  }
+};
 const avatarColors = ['#7366FF', '#FF9F43', '#28C76F', '#EA5455', '#00CFE8', '#A29BFE'];
 
 const openLeadModal = (boardId) => {
@@ -1332,6 +1343,9 @@ const handleDragChange = async (event, stageId) => {
   max-width: 520px;
   box-shadow: 0 25px 60px rgba(75, 70, 92, 0.25);
   overflow: hidden;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .lead-modal-box { max-width: 600px; }
@@ -1365,6 +1379,7 @@ const handleDragChange = async (event, stageId) => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  overflow-y: auto;
 }
 
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }

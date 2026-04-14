@@ -182,6 +182,20 @@ const restoreItem = async (item) => {
       (item.type === 'course' ? 'courses' : 'rooms'))))));
     
     const restoreData = { ...item.data };
+    
+    // Clean data from fields that might not exist in the target table or should be fresh
+    delete restoreData.created_at;
+    delete restoreData.updated_at;
+    
+    // Remove any nested objects that are results of JOINs (e.g., d.teachers, d.courses)
+    // but keep arrays like 'comments_list' if they are supposed to be there
+    Object.keys(restoreData).forEach(key => {
+      const val = restoreData[key];
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        delete restoreData[key];
+      }
+    });
+
     const { error: restoreError } = await supabase.from(tableName).insert([restoreData]);
     if (restoreError) throw restoreError;
     

@@ -40,10 +40,14 @@
         "totalTeachers": "Teachers",
         "totalRooms": "Rooms",
         "totalCourses": "Courses",
-        "pendingReminders": "Pending Payments"
+        "pendingReminders": "Pending Payments",
+        "startDate": "Start Date",
+        "endDate": "End Date"
     },
     "leads": {
         "title": "Leads",
+        "newLeadModalTitle": "Add New Lead",
+        "namePlaceholder": "e.g. John Smith",
         "searchPlaceholder": "Search leads...",
         "noItems": "No leads found",
         "addStage": "Add Stage",
@@ -401,6 +405,8 @@
         "cancel": "Cancel",
         "save": "Save",
         "delete": "Delete",
+        "success": "Success",
+        "error": "Error",
         "edit": "Edit",
         "other": "Other...",
         "loading": "Loading...",

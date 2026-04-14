@@ -88,27 +88,29 @@ const loadData = async () => {
       id: b.id,
       title: b.title,
       color: b.color,
-      tasks: (tasksData || []).filter(t => t.board_id === b.id).map(t => {
-        let leadMetadata = null;
-        let finalDesc = t.description || '';
-        if (finalDesc.includes('[LEAD_DATA]')) {
-          const match = finalDesc.match(/\[LEAD_DATA\](.*?)\[\/LEAD_DATA\]/s);
-          if (match) {
-            try { leadMetadata = JSON.parse(match[1]); } catch(err) { console.error(err); }
-            finalDesc = finalDesc.replace(/\[LEAD_DATA\].*?\[\/LEAD_DATA\]\n?/s, '');
+      tasks: (tasksData || [])
+        .filter(t => t.board_id === b.id)
+        .map(t => {
+          let leadMetadata = null;
+          let finalDesc = t.description || '';
+          if (finalDesc.includes('[LEAD_DATA]')) {
+            const match = finalDesc.match(/\[LEAD_DATA\](.*?)\[\/LEAD_DATA\]/s);
+            if (match) {
+              try { leadMetadata = JSON.parse(match[1]); } catch(err) { console.error(err); }
+              finalDesc = finalDesc.replace(/\[LEAD_DATA\].*?\[\/LEAD_DATA\]\n?/s, '');
+            }
           }
-        }
-        return {
-          id: t.id,
-          title: t.title,
-          description: finalDesc,
-          priority: t.priority,
-          dueDate: t.due_date,
-          progress: t.progress,
-          commentsList: t.comments_list || [],
-          leadMetadata
-        };
-      })
+          return {
+            id: t.id,
+            title: t.title,
+            description: finalDesc,
+            priority: t.priority,
+            dueDate: t.due_date,
+            progress: t.progress,
+            commentsList: t.comments_list || [],
+            leadMetadata
+          };
+        }).reverse()
     }));
   } catch (e) {
     console.error('Error loading today data:', e);
@@ -321,7 +323,7 @@ const confirmAddTask = async () => {
     };
     try {
       await supabase.from('tasks').insert([dbTask]);
-      boards.value[boardIndex].tasks.push({
+      boards.value[boardIndex].tasks.unshift({
         id: dbTask.id,
         title: dbTask.title,
         description: dbTask.description,
