@@ -29,6 +29,7 @@ import { useI18n } from 'vue-i18n';
 const router = useRouter();
 const userRole = ref(localStorage.getItem('userRole') || 'regular');
 const students = ref([]);
+const teachers = ref([]);
 const groups = ref([]);
 const isLoading = ref(true);
 const isSubmitting = ref(false);
@@ -82,7 +83,17 @@ const loadData = async () => {
 
     const { data: studentsData, error: studentsError } = await sQuery;
     if (studentsError) throw studentsError;
-    students.value = studentsData || [];
+    students.value = (studentsData || []).map(s => ({ ...s, isTeacher: false }));
+
+    // 3. Fetch teachers for unified search
+    const { data: teachersData, error: teachersError } = await supabase
+      .from('teachers')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!teachersError) {
+      teachers.value = (teachersData || []).map(t => ({ ...t, isTeacher: true }));
+    }
+
     
   } catch (e) {
     console.error('Data loading error:', e.message);
@@ -102,13 +113,21 @@ watch(searchQuery, () => {
 });
 
 const filteredStudents = computed(() => {
-  let list = students.value;
+  let list = [...students.value, ...teachers.value];
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase();
-    list = list.filter(s => 
-      s.name.toLowerCase().includes(q) || 
-      (s.phone && s.phone.toLowerCase().includes(q))
-    );
+    const qDigits = q.replace(/\D/g, ''); // strip to only digits for phone search
+
+    list = list.filter(item => {
+      const nameMatch = item.name.toLowerCase().includes(q);
+      
+      const phoneDigits = item.phone ? item.phone.toString().replace(/\D/g, '') : '';
+      const phone2Digits = item.phone2 ? item.phone2.toString().replace(/\D/g, '') : '';
+      
+      const phoneMatch = qDigits && (phoneDigits.includes(qDigits) || phone2Digits.includes(qDigits));
+      
+      return nameMatch || phoneMatch;
+    });
   }
   return list;
 });
@@ -364,7 +383,10 @@ const formatDate = (dateStr) => {
                       <img :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=7366FF&color=fff`" :alt="item.name">
                     </div>
                     <div class="details">
-                      <span class="name">{{ item.name }}</span>
+                      <span class="name">
+                        {{ item.name }}
+                        <span v-if="item.isTeacher" class="teacher-badge">Teacher</span>
+                      </span>
                     </div>
                   </div>
                 </td>
@@ -381,13 +403,16 @@ const formatDate = (dateStr) => {
                   </div>
                 </td>
                 <td>
-                  <div class="group-tag clickable" @click="goToGroup(item.group_id)">
+                  <div class="group-tag clickable" v-if="!item.isTeacher" @click="goToGroup(item.group_id)">
                     <Users :size="14" />
                     {{ item.groups?.name || '-' }}
                   </div>
+                  <div class="teacher-subject-tag" v-else>
+                    {{ item.subject || '-' }}
+                  </div>
                 </td>
                 <td>
-                  <span class="course-name">{{ item.groups?.courses?.name || '-' }}</span>
+                  <span class="course-name">{{ item.isTeacher ? 'Staff' : (item.groups?.courses?.name || '-') }}</span>
                 </td>
                 <td>
                   <div class="date-info">
@@ -402,33 +427,38 @@ const formatDate = (dateStr) => {
                 </td>
                 <td>
                   <div class="actions-group" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem;">
-                    <button class="btn-view-action" @click="goToStudentDetail(item.id)">
-                      <Eye :size="20" />
-                    </button>
-                    <button class="btn-view-action payment-btn" @click="openPaymentModal(item)">
-                      <CreditCard :size="20" />
-                    </button>
-                    <div class="dropdown-wrapper" v-if="userRole === 'admin'">
-                    <button 
-                      class="btn-icon-more" 
-                      :class="{ active: activeDropdown === 'student-' + item.id }"
-                      @click="(e) => toggleDropdown('student-' + item.id, e)"
-                    >
-                      <MoreVertical :size="20" />
-                    </button>
-                    <transition name="dropdown">
-                      <div v-if="activeDropdown === 'student-' + item.id" class="dropdown-menu">
-                        <button class="dropdown-item" @click="openEditModal(item)">
-                          <Edit :size="16" /> {{ $t('common.edit') }}
+                    <template v-if="!item.isTeacher">
+                      <button class="btn-view-action" @click="goToStudentDetail(item.id)">
+                        <Eye :size="20" />
+                      </button>
+                      <button class="btn-view-action payment-btn" @click="openPaymentModal(item)">
+                        <CreditCard :size="20" />
+                      </button>
+                      <div class="dropdown-wrapper" v-if="userRole === 'admin'">
+                        <button 
+                          class="btn-icon-more" 
+                          :class="{ active: activeDropdown === 'student-' + item.id }"
+                          @click="(e) => toggleDropdown('student-' + item.id, e)"
+                        >
+                          <MoreVertical :size="20" />
                         </button>
-                        <div class="dropdown-divider"></div>
-                        <button class="dropdown-item danger" @click="confirmDelete(item.id)">
-                          <Trash2 :size="16" /> 
-                          {{ $t('common.delete') }}
-                        </button>
+                        <transition name="dropdown">
+                          <div v-if="activeDropdown === 'student-' + item.id" class="dropdown-menu">
+                            <button class="dropdown-item" @click="openEditModal(item)">
+                              <Edit :size="16" /> {{ $t('common.edit') }}
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item danger" @click="confirmDelete(item.id)">
+                              <Trash2 :size="16" /> 
+                              {{ $t('common.delete') }}
+                            </button>
+                          </div>
+                        </transition>
                       </div>
-                    </transition>
-                  </div>
+                    </template>
+                    <template v-else>
+                      <span style="font-size: 0.8rem; color: var(--gray);">View in Teachers</span>
+                    </template>
                   </div>
                 </td>
               </tr>
@@ -633,6 +663,8 @@ td { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
 .group-tag { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; background: #f0f4ff; color: var(--primary); border-radius: 20px; font-size: 0.85rem; transition: all 0.2s; }
 .group-tag.clickable { cursor: pointer; }
 .group-tag.clickable:hover { background: var(--primary); color: white; transform: translateY(-1px); }
+.teacher-subject-tag { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; background: #e0f2fe; color: #0284c7; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+.teacher-badge { font-size: 0.65rem; background: #0ea5e9; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; margin-left: 0.4rem; font-weight: 700; text-transform: uppercase;}
 .course-name { color: var(--gray); font-size: 0.85rem; }
 
 .status-badge { padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; }

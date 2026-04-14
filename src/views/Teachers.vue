@@ -31,6 +31,7 @@ import { supabase } from '../supabase.js';
 const router = useRouter();
 
 const teachers = ref([]);
+const allGroups = ref([]);
 const isLoading = ref(true);
 const isSubmitting = ref(false);
 const deletingTeacherId = ref(null);
@@ -67,6 +68,14 @@ const loadData = async () => {
     
     if (error) throw error;
     teachers.value = data;
+
+    // Fetch all active groups to allow assignment
+    const { data: groupsData, error: groupsError } = await supabase
+      .from('groups')
+      .select('id, name')
+      .neq('status', 'Finished');
+    if (!groupsError) allGroups.value = groupsData || [];
+
   } catch (e) {
     console.error('Error loading teachers:', e.message);
     teachers.value = [];
@@ -86,7 +95,8 @@ const filteredTeachers = computed(() => {
     const q = searchQuery.value.toLowerCase();
     list = list.filter(t => 
       t.name.toLowerCase().includes(q) || 
-      t.subject.toLowerCase().includes(q)
+      t.subject.toLowerCase().includes(q) ||
+      (t.phone && t.phone.toLowerCase().includes(q))
     );
   }
   return list;
@@ -167,8 +177,18 @@ const teacherForm = reactive({
   phone: '',
   email: '',
   percentage: 0,
-  password: ''
+  password: '',
+  groupIds: []
 });
+
+const toggleGroupSelection = (groupId) => {
+  const index = teacherForm.groupIds.indexOf(groupId);
+  if (index === -1) {
+    teacherForm.groupIds.push(groupId);
+  } else {
+    teacherForm.groupIds.splice(index, 1);
+  }
+};
 
 const openAddModal = () => {
   isEditing.value = false;
@@ -179,6 +199,7 @@ const openAddModal = () => {
   teacherForm.email = '';
   teacherForm.percentage = 0;
   teacherForm.password = '';
+  teacherForm.groupIds = [];
   showModal.value = true;
 };
 
@@ -191,6 +212,7 @@ const openEditModal = (teacher) => {
   teacherForm.email = teacher.email;
   teacherForm.percentage = teacher.percentage || 0;
   teacherForm.password = teacher.password || '';
+  teacherForm.groupIds = (teacher.groups || []).map(g => g.id);
   showModal.value = true;
 };
 
@@ -213,6 +235,8 @@ const submitForm = async () => {
   };
 
   try {
+    let currentTeacherId = editingId.value;
+
     if (isEditing.value) {
       const { error } = await supabase
         .from('teachers')
@@ -221,11 +245,24 @@ const submitForm = async () => {
       if (error) throw error;
     } else {
       dbTeacher.created_at = new Date().toISOString();
-      const { error } = await supabase
+      const { data: newTeacherData, error } = await supabase
         .from('teachers')
-        .insert([dbTeacher]);
+        .insert([dbTeacher])
+        .select()
+        .single();
       if (error) throw error;
+      currentTeacherId = newTeacherData.id;
     }
+
+    if (currentTeacherId) {
+      // 1. Remove this teacher from any groups they were previously assigned to
+      await supabase.from('groups').update({ teacher_id: null }).eq('teacher_id', currentTeacherId);
+      // 2. Assign this teacher to the newly selected groups
+      if (teacherForm.groupIds && teacherForm.groupIds.length > 0) {
+        await supabase.from('groups').update({ teacher_id: currentTeacherId }).in('id', teacherForm.groupIds);
+      }
+    }
+
     await loadData();
     closeModal();
   } catch (e) {
@@ -443,6 +480,31 @@ const getStatusClass = (status) => {
                 <input v-model="teacherForm.password" type="password" :placeholder="$t('common.passwordPlaceholder')" />
               </div>
             </div>
+            
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Assign Groups</label>
+              <div class="groups-checkbox-grid">
+                <label 
+                  v-for="group in allGroups" 
+                  :key="group.id" 
+                  class="checkbox-card"
+                  :class="{ active: teacherForm.groupIds.includes(group.id) }"
+                >
+                  <input 
+                    type="checkbox" 
+                    :value="group.id"
+                    :checked="teacherForm.groupIds.includes(group.id)"
+                    @change="toggleGroupSelection(group.id)"
+                    class="hidden-radio"
+                  />
+                  <span class="group-select-name">{{ group.name }}</span>
+                  <div class="checkbox-indicator">
+                    <Check v-if="teacherForm.groupIds.includes(group.id)" :size="14" />
+                  </div>
+                </label>
+              </div>
+              <p v-if="allGroups.length === 0" class="text-muted" style="margin-top: 0.5rem; font-size: 0.85rem;">No active groups available to assign.</p>
+            </div>
           </div>
 
           <div class="modal-footer">
@@ -602,4 +664,13 @@ input:focus, select:focus { border-color: var(--primary); background: white; box
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; }
 @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.groups-checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; max-height: 200px; overflow-y: auto; padding: 0.25rem; }
+.checkbox-card { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: var(--light); user-select: none; }
+.checkbox-card:hover { border-color: var(--primary-light); }
+.checkbox-card.active { border-color: var(--primary); background: #fdfcff; }
+.hidden-radio { display: none; }
+.group-select-name { font-size: 0.9rem; font-weight: 600; color: var(--dark); }
+.checkbox-indicator { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; background: white; color: white; transition: all 0.2s; }
+.checkbox-card.active .checkbox-indicator { background: var(--primary); border-color: var(--primary); }
 </style>

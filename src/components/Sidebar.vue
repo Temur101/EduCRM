@@ -43,6 +43,7 @@ const menuItems = [
 
 const adminOnlyKeys = ['sidebar.payments', 'sidebar.reminders', 'sidebar.archive', 'sidebar.botManager', 'sidebar.staff'];
 const teacherHiddenKeys = [
+  'sidebar.dashboard',
   'sidebar.leads', 
   'sidebar.payments', 
   'sidebar.reminders', 
@@ -59,7 +60,13 @@ const teacherHiddenKeys = [
 const filteredMenuItems = computed(() => {
   if (userRole.value === 'admin') return menuItems;
   if (userRole.value === 'teacher') {
-    return menuItems.filter(item => !teacherHiddenKeys.includes(item.key));
+    return menuItems
+      .filter(item => !teacherHiddenKeys.includes(item.key))
+      .map(item => {
+        if (item.path === '/groups') return { ...item, path: '/teacher/groups' };
+        if (item.path === '/students') return { ...item, path: '/teacher/students' };
+        return item;
+      });
   }
   return menuItems.filter(item => !adminOnlyKeys.includes(item.key));
 });

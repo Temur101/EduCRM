@@ -28,6 +28,8 @@ const routes = [
   { path: '/teachers', name: 'Teachers', component: () => import('../views/Teachers.vue') },
   { path: '/courses', name: 'Courses', component: () => import('../views/Courses.vue') },
   { path: '/groups', name: 'Groups', component: () => import('../views/Groups.vue') },
+  { path: '/teacher/groups', name: 'TeacherGroups', component: () => import('../views/Groups.vue') },
+  { path: '/teacher/students', name: 'TeacherStudents', component: () => import('../views/Students.vue') },
   { path: '/rooms', name: 'Rooms', component: () => import('../views/Rooms.vue') },
   { path: '/groups/:id', name: 'GroupDetails', component: () => import('../views/GroupDetails.vue') },
   { path: '/students/:id', name: 'StudentDetails', component: () => import('../views/StudentDetails.vue') },
@@ -51,6 +53,13 @@ router.beforeEach((to, from, next) => {
     next({ name: 'Login' });
   } else if (publicPages.includes(to.name) && isLoggedIn) {
     next({ name: 'Dashboard' });
+  } else if (userRole === 'teacher') {
+    // ENFORCE STRICT TEACHER BOUNDARY
+    if (to.path === '/teacher/groups' || to.path === '/teacher/students') {
+      next();
+    } else {
+      next({ path: '/teacher/groups' });
+    }
   } else if (to.meta.requiresAdmin && userRole !== 'admin') {
     next({ name: 'Dashboard' }); // Redirect non-admins to dashboard
   } else {
