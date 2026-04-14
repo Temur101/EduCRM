@@ -39,10 +39,13 @@
         "totalGroups": "Groups",
         "totalTeachers": "Teachers",
         "totalRooms": "Rooms",
-        "totalCourses": "Courses"
+        "totalCourses": "Courses",
+        "pendingReminders": "Pending Payments"
     },
     "leads": {
         "title": "Leads",
+        "searchPlaceholder": "Search leads...",
+        "noItems": "No leads found",
         "addStage": "Add Stage",
         "addStagePlaceholder": "Add New Stage",
         "newLead": "New Lead",

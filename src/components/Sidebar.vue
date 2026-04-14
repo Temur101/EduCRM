@@ -147,7 +147,7 @@ const handleLogout = () => {
 }
 
 .sidebar-header {
-  height: 100px; /* Increased height for logo area */
+  height: 80px; /* Reduced to match smaller logo */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -163,7 +163,7 @@ const handleLogout = () => {
 }
 
 .main-logo {
-  height: 65px; /* Slightly larger for better visibility */
+  height: 48px; /* Reduced for a cleaner look */
   width: auto;
   object-fit: contain;
   transition: transform 0.3s ease;

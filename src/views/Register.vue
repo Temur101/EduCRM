@@ -84,10 +84,7 @@ const handleRegister = async () => {
       <div class="register-card card">
         <div class="register-header">
           <div class="brand">
-            <div class="logo-box">
-              <span class="logo-icon">E</span>
-            </div>
-            <h1>EduCRM</h1>
+            <img src="../assets/logo.png" alt="EduCRM" class="register-logo" />
           </div>
           <p class="subtitle">{{ $t('register.title') }}</p>
         </div>
@@ -209,29 +206,10 @@ const handleRegister = async () => {
   margin-bottom: 1rem;
 }
 
-.logo-box {
-  width: 42px;
-  height: 42px;
-  background: var(--primary);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 16px rgba(115, 102, 255, 0.25);
-}
-
-.logo-icon {
-  color: white;
-  font-weight: 800;
-  font-size: 1.25rem;
-}
-
-.brand h1 {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: var(--dark);
-  margin: 0;
-  letter-spacing: -0.5px;
+.register-logo {
+  height: 64px;
+  width: auto;
+  object-fit: contain;
 }
 
 .subtitle {

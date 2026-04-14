@@ -233,7 +233,7 @@ const handleLogin = async () => {
 }
 
 .login-logo {
-  height: 80px;
+  height: 64px;
   width: auto;
   object-fit: contain;
 }
