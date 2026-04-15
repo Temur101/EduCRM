@@ -27,11 +27,11 @@ const userName = ref(localStorage.getItem('userName') || 'User');
 const menuItems = [
   { key: 'sidebar.dashboard', path: '/', icon: LayoutDashboard },
   { key: 'sidebar.tasks', path: '/tasks', icon: CheckSquare },
+  { key: 'sidebar.today', path: '/today', icon: Calendar },
   { key: 'sidebar.leads', path: '/leads', icon: Users },
   { key: 'sidebar.students', path: '/students', icon: GraduationCap },
   { key: 'sidebar.payments', path: '/payments', icon: CreditCard },
   { key: 'sidebar.reminders', path: '/reminders', icon: Bell },
-  { key: 'sidebar.today', path: '/today', icon: Calendar },
   { key: 'sidebar.archive', path: '/archive', icon: Archive },
   { key: 'sidebar.teachers', path: '/teachers', icon: UserCheck },
   { key: 'sidebar.courses', path: '/courses', icon: BookOpen },

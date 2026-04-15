@@ -86,9 +86,8 @@ const totalPages = computed(() => {
 });
 
 const paginatedStaff = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage;
-  const end = start + itemsPerPage;
-  return filteredStaff.value.slice(start, end);
+  // Show all staff as requested ("пусть все будет видно")
+  return filteredStaff.value;
 });
 
 const setPage = (page) => {
@@ -332,7 +331,8 @@ const submitForm = async () => {
         </table>
       </div>
 
-      <div v-if="totalPages > 1" class="pagination-footer">
+      <!-- Pagination hidden as requested to show all items -->
+      <div v-if="false && totalPages > 1" class="pagination-footer">
         <div class="pagination-info">
           {{ $t('common.showing') }} 
           <b>{{ (currentPage - 1) * itemsPerPage + 1 }}-{{ Math.min(currentPage * itemsPerPage, filteredStaff.length) }}</b> 
@@ -456,7 +456,7 @@ const submitForm = async () => {
 .search-bar { display: flex; align-items: center; gap: 0.75rem; background: var(--light); padding: 0.6rem 1rem; border-radius: 12px; max-width: 350px; }
 .search-bar input { background: transparent; border: none; outline: none; width: 100%; }
 
-.table-scroll-wrapper { overflow-x: auto; padding-bottom: 8rem; }
+.table-scroll-wrapper { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; padding: 1.25rem 1.5rem; background: #F8F9FA; font-size: 0.8rem; font-weight: 700; color: var(--gray); text-transform: uppercase; }
 td { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }

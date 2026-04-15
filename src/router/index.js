@@ -54,8 +54,16 @@ router.beforeEach((to, from, next) => {
   } else if (publicPages.includes(to.name) && isLoggedIn) {
     next({ name: 'Dashboard' });
   } else if (userRole === 'teacher') {
-    // ENFORCE STRICT TEACHER BOUNDARY
-    if (to.path === '/teacher/groups' || to.path === '/teacher/students') {
+    // Teachers can access their specific views and any detail views
+    const allowedPatterns = [
+      /^\/teacher\/groups/,
+      /^\/teacher\/students/,
+      /^\/groups\/[^\/]+$/,
+      /^\/students\/[^\/]+$/
+    ];
+    const isAllowed = allowedPatterns.some(pattern => pattern.test(to.path));
+    
+    if (isAllowed) {
       next();
     } else {
       next({ path: '/teacher/groups' });

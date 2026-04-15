@@ -34,6 +34,7 @@ import PaymentModal from '../components/PaymentModal.vue';
 const route = useRoute();
 const router = useRouter();
 const studentId = route.params.id;
+const userRole = ref(localStorage.getItem('userRole') || 'regular');
 
 const student = ref(null);
 const group = ref(null);
@@ -232,6 +233,108 @@ const recentRecords = computed(() => {
 });
 
 const getStatusMeta = (key) => STATUSES.find(s => s.key === key) || null;
+
+// --- Picker & Set Status Logic ---
+const activeCell = ref(null); // dateKey
+const pickerPos = ref({ top: 0, left: 0 });
+const pickerDate = ref(null);
+
+const openPicker = (event, date) => {
+  const key = dateKey(date);
+  if (activeCell.value === key) {
+    activeCell.value = null;
+    return;
+  }
+  
+  const rect = event.currentTarget.getBoundingClientRect();
+  const pickerWidth = 160;
+  const pickerHeight = 220;
+  let left = rect.left + rect.width / 2 - pickerWidth / 2;
+  let top = rect.bottom + 6;
+  
+  if (left < 8) left = 8;
+  if (left + pickerWidth > window.innerWidth - 8) left = window.innerWidth - pickerWidth - 8;
+  if (top + pickerHeight > window.innerHeight - 8) top = rect.top - pickerHeight - 6;
+  
+  pickerPos.value = { top, left };
+  pickerDate.value = new Date(attYear.value, attMonth.value, date);
+  activeCell.value = key;
+};
+
+const closePicker = () => { activeCell.value = null; };
+
+const checkTrialStatus = async () => {
+  if (!student.value || !['Trial', 'Active'].includes(student.value.status)) return;
+
+  const { count, error } = await supabase
+    .from('attendance')
+    .select('*', { count: 'exact', head: true })
+    .eq('student_id', studentId)
+    .eq('status', 'present');
+
+  if (error) return;
+
+  if (count > 2 && student.value.status === 'Trial') {
+    const { error: updateError } = await supabase
+      .from('students')
+      .update({ status: 'Active' })
+      .eq('id', studentId);
+    
+    if (!updateError) student.value.status = 'Active';
+  } else if (count <= 2 && student.value.status === 'Active') {
+    const { error: updateError } = await supabase
+      .from('students')
+      .update({ status: 'Trial' })
+      .eq('id', studentId);
+    
+    if (!updateError) student.value.status = 'Trial';
+  }
+};
+
+const setStatus = async (date, newStatus) => {
+  if (!studentId) return;
+  const key = dateKey(date.getDate());
+  const current = attMap.value[key] || null;
+
+  if (current === newStatus) {
+    // Clear status
+    const newAtt = { ...attMap.value };
+    delete newAtt[key];
+    attMap.value = newAtt;
+    try {
+      await supabase.from('attendance').delete()
+        .match({ student_id: studentId, lesson_date: key });
+      await checkTrialStatus();
+    } catch (e) { attMap.value = { ...attMap.value, [key]: current }; }
+    return;
+  }
+
+  attMap.value = { ...attMap.value, [key]: newStatus };
+  try {
+    await supabase.from('attendance').upsert([{
+      student_id: studentId,
+      group_id: student.value?.group_id,
+      lesson_date: key,
+      status: newStatus
+    }], { onConflict: 'student_id,group_id,lesson_date' });
+    await checkTrialStatus();
+  } catch (e) {
+    const newAtt = { ...attMap.value };
+    if (current === null) delete newAtt[key];
+    else newAtt[key] = current;
+    attMap.value = newAtt;
+    console.error('Error saving attendance:', e);
+  }
+};
+
+const isBeforeJoin = (dateNum) => {
+  if (!student.value?.created_at || !dateNum) return false;
+  const joinDate = new Date(student.value.created_at);
+  joinDate.setHours(0,0,0,0);
+  const cellDate = new Date(attYear.value, attMonth.value, dateNum);
+  cellDate.setHours(0,0,0,0);
+  return cellDate < joinDate;
+};
 
 
 onMounted(() => {
@@ -443,8 +546,7 @@ const onPaymentSuccess = () => {
       </button>
       
       <div class="header-actions">
-
-        <button class="btn-outline-primary">
+        <button v-if="userRole === 'admin'" class="btn-outline-primary">
           <Edit :size="18" />
           {{ $t('common.edit') }}
         </button>
@@ -588,7 +690,7 @@ const onPaymentSuccess = () => {
             </div>
 
             <!-- Discount editor -->
-            <div class="discount-editor">
+            <div class="discount-editor" v-if="userRole === 'admin'">
               <div class="discount-label">
                 <span>Chegirma berish</span>
                 <span class="discount-hint">UZS summasi</span>
@@ -656,8 +758,8 @@ const onPaymentSuccess = () => {
                 v-for="item in billingSummary" 
                 :key="item.monthStr" 
                 class="billing-month-card" 
-                :class="item.status"
-                @click="openPaymentForMonth(item)"
+                :class="[item.status, { 'clickable': userRole === 'admin' }]"
+                @click="userRole === 'admin' && openPaymentForMonth(item)"
               >
                 <div class="month-main">
                   <div class="month-name-wrap">
@@ -694,8 +796,8 @@ const onPaymentSuccess = () => {
             </div>
           </div>
 
-          <!-- Payment Button moved here -->
-          <div class="payment-action-wrapper" style="margin-top: 1.5rem;">
+          <!-- Payment Button -->
+          <div v-if="userRole === 'admin'" class="payment-action-wrapper" style="margin-top: 1.5rem;">
             <button class="btn-primary" style="width: 100%; justify-content: center; padding: 1rem; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px;" @click="openPaymentModal">
               <CreditCard :size="18" />
               {{ $t('students.payNow') }}
@@ -839,13 +941,15 @@ const onPaymentSuccess = () => {
                     'att-day',
                     day === null ? 'att-day-empty' : '',
                     day !== null && dateKey(day) === todayKey ? 'att-day-today' : '',
-                    day !== null && attMap[dateKey(day)] ? 'att-day-filled' : ''
+                    day !== null && attMap[dateKey(day)] ? 'att-day-filled' : '',
+                    day !== null && !isBeforeJoin(day) ? 'att-day-interactive' : ''
                   ]"
                   :style="day !== null && attMap[dateKey(day)] ? {
                     background: getStatusMeta(attMap[dateKey(day)])?.bg,
                     color: getStatusMeta(attMap[dateKey(day)])?.color,
                     borderColor: getStatusMeta(attMap[dateKey(day)])?.color + '44'
                   } : {}"
+                  @click="day !== null && !isBeforeJoin(day) && openPicker($event, day)"
                 >
                   <template v-if="day !== null">
                     <span class="att-day-num">{{ day }}</span>
@@ -876,7 +980,35 @@ const onPaymentSuccess = () => {
           </div>
         </div>
       </div>
-    </template>
+      </template>
+    
+    <!-- Teleported Status Picker -->
+    <Teleport to="body">
+      <div
+        v-if="activeCell && pickerDate"
+        class="status-picker-fixed"
+        :style="{ top: pickerPos.top + 'px', left: pickerPos.left + 'px' }"
+        @click.stop
+      >
+        <div class="picker-date">
+          {{ pickerDate.getDate() }} {{ MONTH_NAMES[pickerDate.getMonth()] }}
+        </div>
+        <button
+          v-for="s in STATUSES"
+          :key="s.key"
+          class="picker-btn"
+          :class="{ 'picker-active': attMap[dateKey(pickerDate.getDate())] === s.key }"
+          :style="{ '--btn-color': s.color, '--btn-bg': s.bg }"
+          @click="setStatus(pickerDate, s.key); closePicker()"
+        >
+          <span class="picker-icon">{{ s.short }}</span>
+          {{ s.label }}
+        </button>
+        <button class="picker-btn picker-clear" @click="setStatus(pickerDate, attMap[dateKey(pickerDate.getDate())]); closePicker()">
+          ✕ Bekor qilish
+        </button>
+      </div>
+    </Teleport>
     
     <!-- Status Modal -->
     <transition name="modal">
@@ -1950,6 +2082,8 @@ td {
   position: relative;
 }
 .att-day:not(.att-day-empty):hover { transform: scale(1.08); }
+.att-day-interactive { cursor: pointer !important; }
+.att-day-interactive:hover { background: #F0EEFF !important; border-color: var(--primary) !important; z-index: 5; }
 .att-day-empty { background: transparent; border-color: transparent; }
 .att-day-num {
   font-size: .75rem;

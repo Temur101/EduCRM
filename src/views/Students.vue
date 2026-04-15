@@ -85,14 +85,8 @@ const loadData = async () => {
     if (studentsError) throw studentsError;
     students.value = (studentsData || []).map(s => ({ ...s, isTeacher: false }));
 
-    // 3. Fetch teachers for unified search
-    const { data: teachersData, error: teachersError } = await supabase
-      .from('teachers')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!teachersError) {
-      teachers.value = (teachersData || []).map(t => ({ ...t, isTeacher: true }));
-    }
+    // 3. (Removed teacher fetching for this view as requested)
+    teachers.value = [];
 
     
   } catch (e) {
@@ -113,7 +107,7 @@ watch(searchQuery, () => {
 });
 
 const filteredStudents = computed(() => {
-  let list = [...students.value, ...teachers.value];
+  let list = [...students.value];
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase();
     const qDigits = q.replace(/\D/g, ''); // strip to only digits for phone search
@@ -137,9 +131,8 @@ const totalPages = computed(() => {
 });
 
 const paginatedStudents = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage;
-  const end = start + itemsPerPage;
-  return filteredStudents.value.slice(start, end);
+  // Show all students as requested ("пусть все будет видно")
+  return filteredStudents.value;
 });
 
 const setPage = (page) => {
@@ -431,7 +424,7 @@ const formatDate = (dateStr) => {
                       <button class="btn-view-action" @click="goToStudentDetail(item.id)">
                         <Eye :size="20" />
                       </button>
-                      <button class="btn-view-action payment-btn" @click="openPaymentModal(item)">
+                      <button v-if="userRole === 'admin'" class="btn-view-action payment-btn" @click="openPaymentModal(item)">
                         <CreditCard :size="20" />
                       </button>
                       <div class="dropdown-wrapper" v-if="userRole === 'admin'">
@@ -467,7 +460,8 @@ const formatDate = (dateStr) => {
         </table>
       </div>
 
-      <div v-if="totalPages > 1" class="pagination-footer">
+      <!-- Pagination hidden as requested to show all items -->
+      <div v-if="false && totalPages > 1" class="pagination-footer">
         <div class="pagination-info">
           {{ $t('common.showing') }} 
           <b>{{ (currentPage - 1) * itemsPerPage + 1 }}-{{ Math.min(currentPage * itemsPerPage, filteredStudents.length) }}</b> 
@@ -643,7 +637,7 @@ const formatDate = (dateStr) => {
 .search-bar { display: flex; align-items: center; gap: 0.75rem; background: var(--light); padding: 0.6rem 1rem; border-radius: 12px; max-width: 350px; }
 .search-bar input { background: transparent; border: none; outline: none; width: 100%; }
 
-.table-scroll-wrapper { overflow-x: auto; padding-bottom: 8rem; }
+.table-scroll-wrapper { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; padding: 1.25rem 1.5rem; background: #F8F9FA; font-size: 0.8rem; font-weight: 700; color: var(--gray); text-transform: uppercase; }
 td { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }

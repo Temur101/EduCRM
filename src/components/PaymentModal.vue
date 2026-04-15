@@ -848,7 +848,7 @@ onMounted(() => {
 .day-dow { font-size: 0.65rem; color: #94A3B8; font-weight: 600; }
 
 .pc-chip-lesson { border-color: #E2E8F0; background: #F8FAFC; color: #64748B; }
-.pc-chip-selected { background: var(--primary); color: white; border-color: var(--primary); }
+
 .pc-chip-sick { background: #FEF3C7; color: #D97706; border-color: #FCD34D; }
 .pc-chip-before-join { opacity: 0.3; pointer-events: none; background: #F1F5F9; }
 
@@ -857,6 +857,7 @@ onMounted(() => {
 .pc-chip-att-absent  { background: #FEE2E2 !important; color: #DC2626 !important; border-color: #FCA5A5 !important; }
 .pc-chip-att-sick    { background: #FEF3C7 !important; color: #D97706 !important; border-color: #FCD34D !important; }
 .pc-chip-att-late    { background: #E0E7FF !important; color: #4F46E5 !important; border-color: #A5B4FC !important; }
+.pc-chip-selected { background: var(--primary) !important; color: white !important; border-color: var(--primary) !important; z-index: 2; }
 
 /* Summary */
 .calc-summary {
