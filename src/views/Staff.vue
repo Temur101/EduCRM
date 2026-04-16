@@ -316,7 +316,7 @@ const submitForm = async () => {
           <tbody>
             <template v-if="isLoading">
               <tr v-for="i in 5" :key="i">
-                <td>
+                <td :data-label="$t('staff.name') || 'NAME'">
                   <div class="staff-info">
                     <div class="skeleton" style="width: 40px; height: 40px; border-radius: 50%;"></div>
                     <div class="details">
@@ -324,10 +324,10 @@ const submitForm = async () => {
                     </div>
                   </div>
                 </td>
-                <td><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 90px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 24px; height: 24px; border-radius: 6px;"></div></td>
+                <td :data-label="$t('staff.role') || 'ROLE'"><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
+                <td :data-label="$t('staff.phone') || 'PHONE'"><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
+                <td :data-label="$t('common.addedDate')"><div class="skeleton" style="width: 90px; height: 16px;"></div></td>
+                <td :data-label="$t('common.actions') || 'Actions'"><div class="skeleton" style="width: 24px; height: 24px; border-radius: 6px;"></div></td>
               </tr>
             </template>
 
@@ -336,7 +336,7 @@ const submitForm = async () => {
                 <td colspan="5" class="no-data">{{ $t('common.noData') }}</td>
               </tr>
               <tr v-for="item in paginatedStaff" :key="item.id">
-                <td>
+                <td :data-label="$t('staff.name') || 'NAME'">
                   <div class="staff-info">
                     <div class="avatar">{{ item.name.charAt(0) }}</div>
                     <div class="details">
@@ -345,20 +345,20 @@ const submitForm = async () => {
                     </div>
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('staff.role') || 'ROLE'">
                   <div class="role-tag" :class="item.role">
                     <Shield :size="14" />
                     {{ $t('roles.' + item.role) || item.role }}
                   </div>
                 </td>
-                <td>{{ item.phone || '-' }}</td>
-                <td>
+                <td :data-label="$t('staff.phone') || 'PHONE'">{{ item.phone || '-' }}</td>
+                <td :data-label="$t('common.addedDate')">
                   <div class="date-info">
                     <Calendar :size="14" />
                     {{ new Date(item.created_at).toLocaleDateString() }}
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('common.actions') || 'Actions'">
                   <div class="dropdown-wrapper">
                     <button 
                       class="btn-icon-more" 

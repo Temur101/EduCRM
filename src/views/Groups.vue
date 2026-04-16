@@ -360,16 +360,16 @@ const formatDate = (dateStr) => {
           <tbody>
             <template v-if="isLoading">
               <tr v-for="i in 5" :key="i">
-                <td>
+                <td :data-label="$t('groups.name')">
                   <div class="skeleton" style="width: 120px; height: 16px; border-radius: 4px;"></div>
                 </td>
-                <td><div class="skeleton" style="width: 100px; height: 16px; border-radius: 4px;"></div></td>
-                <td><div class="skeleton" style="width: 120px; height: 16px; border-radius: 4px;"></div></td>
-                <td><div class="skeleton" style="width: 100px; height: 16px; border-radius: 4px;"></div></td>
-                <td><div class="skeleton" style="width: 80px; height: 16px; border-radius: 4px;"></div></td>
-                <td><div class="skeleton" style="width: 70px; height: 26px; border-radius: 8px;"></div></td>
-                <td><div class="skeleton" style="width: 90px; height: 16px; border-radius: 4px;"></div></td>
-                <td>
+                <td :data-label="$t('groups.course')"><div class="skeleton" style="width: 100px; height: 16px; border-radius: 4px;"></div></td>
+                <td :data-label="$t('groups.teacher')"><div class="skeleton" style="width: 120px; height: 16px; border-radius: 4px;"></div></td>
+                <td :data-label="$t('groups.days')"><div class="skeleton" style="width: 100px; height: 16px; border-radius: 4px;"></div></td>
+                <td :data-label="$t('groups.time')"><div class="skeleton" style="width: 80px; height: 16px; border-radius: 4px;"></div></td>
+                <td :data-label="$t('groups.status')"><div class="skeleton" style="width: 70px; height: 26px; border-radius: 8px;"></div></td>
+                <td :data-label="$t('common.addedDate')"><div class="skeleton" style="width: 90px; height: 16px; border-radius: 4px;"></div></td>
+                <td :data-label="$t('common.actions') || 'Actions'">
                   <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
                     <div class="skeleton" style="width: 38px; height: 38px; border-radius: 10px;"></div>
                     <div v-if="userRole === 'admin'" class="skeleton" style="width: 32px; height: 32px; border-radius: 8px;"></div>
@@ -383,47 +383,47 @@ const formatDate = (dateStr) => {
                 <td :colspan="8" class="no-data">{{ $t('common.noData') }}</td>
               </tr>
               <tr v-for="item in paginatedGroups" :key="item.id">
-                <td>
+                <td :data-label="$t('groups.name')">
                   <div class="group-name-cell">
                     <span class="name">{{ item.name }}</span>
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('groups.course')">
                   <div class="course-tag">
                     <BookOpen :size="14" />
                     {{ item.courses?.name || '-' }}
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('groups.teacher')">
                   <div class="teacher-info">
                     <User :size="14" />
                     {{ item.teachers?.name || '-' }}
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('groups.days')">
                   <div class="days-info">
                     <Calendar :size="14" />
                     {{ item.days || '-' }}
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('groups.time')">
                   <div class="time-info">
                     <Clock :size="14" />
                     {{ item.time || '-' }}
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('groups.status')">
                   <span :class="['status-badge', getStatusClass(item.status)]">
                     {{ $t('groups.' + item.status.toLowerCase()) }}
                   </span>
                 </td>
-                <td>
+                <td :data-label="$t('common.addedDate')">
                   <div class="date-info">
                     <Calendar :size="14" />
                     {{ formatDate(item.created_at) }}
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('common.actions') || 'Actions'">
                   <div class="actions-group" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem;">
                     <button class="btn-view-action" @click="goToDetails(item.id)" title="View Details">
                       <Eye :size="20" />

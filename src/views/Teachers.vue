@@ -317,7 +317,7 @@ const getStatusClass = (status) => {
           <tbody>
             <template v-if="isLoading">
               <tr v-for="i in 5" :key="i">
-                <td>
+                <td :data-label="$t('teachers.name')">
                   <div class="teacher-info">
                     <div class="skeleton" style="width: 40px; height: 40px; border-radius: 50%;"></div>
                     <div class="details">
@@ -326,11 +326,12 @@ const getStatusClass = (status) => {
                     </div>
                   </div>
                 </td>
-                <td><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 60px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 120px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 24px; height: 24px; border-radius: 6px;"></div></td>
+                <td :data-label="$t('teachers.subject')"><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
+                <td :data-label="$t('sidebar.groups') || 'Guruhlar'"><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
+                <td :data-label="$t('teachers.phone')"><div class="skeleton" style="width: 60px; height: 16px;"></div></td>
+                <td :data-label="$t('common.actions')">
+                  <div class="skeleton" style="width: 24px; height: 24px; border-radius: 6px;"></div>
+                </td>
               </tr>
             </template>
 
@@ -340,7 +341,7 @@ const getStatusClass = (status) => {
               </tr>
               <template v-for="item in paginatedTeachers" :key="item.id">
                 <tr class="cursor-pointer hover-bg" @click="toggleRow(item.id)">
-                  <td>
+                  <td :data-label="$t('teachers.name')">
                     <div class="teacher-info">
                       <div class="avatar">{{ item.name.charAt(0) }}</div>
                       <div class="details">
@@ -349,20 +350,20 @@ const getStatusClass = (status) => {
                       </div>
                     </div>
                   </td>
-                  <td>
+                  <td :data-label="$t('teachers.subject')">
                     <div class="subject-tag">
                       <GraduationCap :size="14" />
                       {{ item.subject }}
                     </div>
                   </td>
-                  <td>
+                  <td :data-label="$t('sidebar.groups') || 'Guruhlar'">
                     <div class="groups-count">
                       <Users :size="14" />
                       <span class="share-value">{{ item.groups?.length || 0 }}</span>
                     </div>
                   </td>
-                  <td>{{ item.phone }}</td>
-                  <td>
+                  <td :data-label="$t('teachers.phone')">{{ item.phone }}</td>
+                  <td :data-label="$t('common.actions')">
                     <div class="actions-wrapper">
                       <button class="btn-icon-more" @click.stop="toggleRow(item.id)">
                         <ChevronUp v-if="expandedTeacherId === item.id" :size="20" />

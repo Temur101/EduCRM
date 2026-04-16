@@ -88,6 +88,12 @@ watch(() => route.path, () => {
   min-height: 100%;
 }
 
+@media (max-width: 767px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
 .mobile-overlay {
   position: fixed;
   top: 0;

@@ -691,24 +691,24 @@ onMounted(() => {
                 <td :colspan="userRole === 'admin' ? 7 : 6" class="no-data">{{ $t('common.noData') }}</td>
               </tr>
               <tr v-for="student in students" :key="student.id">
-                <td>
+                <td :data-label="$t('students.name')">
                   <div class="student-info">
                     <img :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(student.name)}&background=7366FF&color=fff`" class="avatar">
                     <span class="name">{{ student.name }}</span>
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('students.phone')">
                   <div class="phone-column">
                     <div class="phone-item"><Phone :size="14" /> {{ student.phone }}</div>
                     <div v-if="student.phone2" class="phone-item secondary">{{ student.phone2 }}</div>
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('students.status')">
                   <span :class="['status-badge-small', student.status.toLowerCase()]">
                     {{ $t('students.' + student.status.toLowerCase()) }}
                   </span>
                 </td>
-                <td>
+                <td data-label="To'lov holati (Qarz)">
                   <div class="debt-list-cell">
                     <template v-if="getDebtSummary(student).length > 0">
                       <div class="debt-group">
@@ -722,16 +722,16 @@ onMounted(() => {
                     </template>
                   </div>
                 </td>
-                <td>
+                <td data-label="Chegirma">
                   <span v-if="student.discount && student.discount > 0" class="discount-badge">
                     &minus; {{ new Intl.NumberFormat('uz-UZ').format(student.discount) }} UZS
                   </span>
                   <span v-else class="no-discount">—</span>
                 </td>
-                <td>
+                <td :data-label="$t('students.addedDate')">
                   <div class="date-info"><Calendar :size="14" /> {{ formatDate(student.created_at) }}</div>
                 </td>
-                <td v-if="userRole === 'admin'" class="text-right">
+                <td v-if="userRole === 'admin'" class="text-right" :data-label="$t('common.actions') || 'Actions'">
                   <button class="btn-icon" @click="goToStudent(student.id)"><ArrowRight :size="18" /></button>
                 </td>
               </tr>
@@ -811,7 +811,7 @@ onMounted(() => {
             <tbody>
               <tr v-for="(student, sIdx) in students" :key="student.id">
                 <!-- Name -->
-                <td class="td-name">
+                <td class="td-name" :data-label="'# ' + $t('students.name')">
                   <div class="td-name-inner">
                     <span class="td-num">{{ sIdx + 1 }}</span>
                     <span class="td-sname">{{ student.name }}</span>
@@ -822,6 +822,7 @@ onMounted(() => {
                 <td
                   v-for="(date, dIdx) in monthLessonDates"
                   :key="dIdx"
+                  :data-label="date.getDate() + ' ' + MONTH_NAMES_UZ[date.getMonth()]"
                   :class="[
                     'td-cell',
                     formatDateKey(date) === todayKey ? 'col-today' : '',
@@ -849,10 +850,10 @@ onMounted(() => {
                 </td>
 
                 <!-- Summary cells -->
-                <td class="td-sum sum-present">{{ studentSummary(student.id).present }}</td>
-                <td class="td-sum sum-absent">{{ studentSummary(student.id).absent }}</td>
-                <td class="td-sum sum-sick">{{ studentSummary(student.id).sick }}</td>
-                <td class="td-sum sum-late">{{ studentSummary(student.id).late }}</td>
+                <td class="td-sum sum-present" data-label="✓ Present">{{ studentSummary(student.id).present }}</td>
+                <td class="td-sum sum-absent" data-label="✗ Absent">{{ studentSummary(student.id).absent }}</td>
+                <td class="td-sum sum-sick" data-label="⚕ Sick">{{ studentSummary(student.id).sick }}</td>
+                <td class="td-sum sum-late" data-label="⏱ Late">{{ studentSummary(student.id).late }}</td>
               </tr>
             </tbody>
           </table>

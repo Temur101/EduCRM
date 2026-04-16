@@ -141,37 +141,17 @@ const handleLogout = () => {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@media (min-width: 768px) and (max-width: 1024px) {
+@media (max-width: 1024px) and (min-width: 768px) {
   .sidebar {
-    width: var(--sidebar-width);
+    width: 80px;
   }
-  .sidebar .name {
-    display: none;
-  }
-  .sidebar .arrow {
-    display: none;
-  }
-  .sidebar .section-title {
-    opacity: 0;
-  }
-  .sidebar .user-info {
-    justify-content: center;
-  }
-  .sidebar .user-info > div:not(.user-avatar-placeholder) {
-    display: none;
-  }
-  .nav-item {
-    justify-content: center;
-    padding: 0.75rem 0;
-  }
-  .icon {
-    margin-right: 0;
-  }
-  .logout-menu {
-    left: 0.5rem;
-    right: auto;
-    width: 200px;
-  }
+  .name, .arrow, .section-title { display: none; }
+  .sidebar-header { padding: 1rem 0; justify-content: center; }
+  .nav-item { justify-content: center; padding: 0.75rem 0; }
+  .icon { margin-right: 0; }
+  .user-info { justify-content: center; padding: 0.6rem 0; }
+  .user-info div { display: none; }
+  .logout-menu { left: 85px; bottom: 0; width: max-content; }
 }
 
 @media (max-width: 767px) {

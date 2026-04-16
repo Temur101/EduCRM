@@ -880,12 +880,12 @@ const onPaymentSuccess = () => {
                 </thead>
                 <tbody>
                   <tr v-for="pay in payments" :key="pay.id">
-                    <td class="whitespace-nowrap">{{ formatDate(pay.date) }}</td>
-                    <td class="font-bold">{{ formatCurrency(pay.amount) }}</td>
-                    <td><span class="month-badge">{{ pay.month || '-' }}</span></td>
-                    <td class="comment-cell">{{ pay.comment || '-' }}</td>
-                    <td>{{ pay.method }}</td>
-                    <td>
+                    <td class="whitespace-nowrap" :data-label="$t('students.date')">{{ formatDate(pay.date) }}</td>
+                    <td class="font-bold" :data-label="$t('students.amount')">{{ formatCurrency(pay.amount) }}</td>
+                    <td :data-label="$t('students.month')"><span class="month-badge">{{ pay.month || '-' }}</span></td>
+                    <td class="comment-cell" :data-label="$t('students.comment')">{{ pay.comment || '-' }}</td>
+                    <td :data-label="$t('students.method')">{{ pay.method }}</td>
+                    <td :data-label="$t('students.status')">
                       <span :class="['status-badge-small', getStatusClass(pay.status)]">
                         {{ pay.status }}
                       </span>

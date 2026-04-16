@@ -284,20 +284,20 @@ const permanentDelete = async () => {
             <!-- Loading State -->
             <template v-if="isLoading">
               <tr v-for="i in 5" :key="i">
-                <td>
+                <td :data-label="$t('archive.type')">
                   <div class="skeleton" style="width: 90px; height: 26px; border-radius: 8px;"></div>
                 </td>
-                <td>
+                <td :data-label="$t('archive.contentTitle')">
                   <div class="skeleton" style="width: 200px; height: 18px; margin-bottom: 6px;"></div>
                   <div class="skeleton" style="width: 120px; height: 12px;"></div>
                 </td>
-                <td>
+                <td :data-label="$t('archive.archivedAt')">
                   <div class="skeleton" style="width: 140px; height: 16px;"></div>
                 </td>
-                <td>
+                <td :data-label="$t('archive.originalId')">
                   <div class="skeleton" style="width: 90px; height: 16px; border-radius: 4px;"></div>
                 </td>
-                <td class="actions-col">
+                <td class="actions-col" :data-label="$t('archive.actions')">
                   <div style="display: flex; gap: 8px; justify-content: flex-end;">
                     <div class="skeleton" style="width: 32px; height: 32px; border-radius: 8px;"></div>
                     <div class="skeleton" style="width: 32px; height: 32px; border-radius: 8px;"></div>
@@ -320,22 +320,22 @@ const permanentDelete = async () => {
             <!-- Real Data -->
             <template v-else>
               <tr v-for="item in filteredArchives" :key="item.id">
-                <td>
+                <td :data-label="$t('archive.type')">
                   <div class="type-tag" :style="{ color: getTypeColor(item.type), backgroundColor: getTypeColor(item.type) + '15' }">
                     <component :is="getTypeIcon(item.type)" :size="14" />
                     {{ item.type.toUpperCase() }}
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('archive.contentTitle')">
                   <span class="item-title">{{ getItemTitle(item) }}</span>
                 </td>
-                <td>
+                <td :data-label="$t('archive.archivedAt')">
                   <span class="archived-date">{{ formatDate(item.archived_at) }}</span>
                 </td>
-                <td>
+                <td :data-label="$t('archive.originalId')">
                   <code class="original-id">{{ item.original_id }}</code>
                 </td>
-                <td class="actions-col">
+                <td class="actions-col" :data-label="$t('archive.actions')">
                   <div class="action-buttons">
                     <button class="btn-action view" @click="openDetails(item)" title="View Details">
                       <Eye :size="16" />

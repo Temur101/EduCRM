@@ -481,7 +481,7 @@ const getMethodIcon = (method) => {
             <!-- Skeleton Loading -->
             <template v-if="isLoading">
               <tr v-for="i in 5" :key="i">
-                <td>
+                <td :data-label="$t('payments.studentColumn')">
                   <div class="student-info">
                     <div class="skeleton" style="width: 36px; height: 36px; border-radius: 50%;"></div>
                     <div class="details">
@@ -490,19 +490,21 @@ const getMethodIcon = (method) => {
                     </div>
                   </div>
                 </td>
-                <td><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 90px; height: 24px; border-radius: 6px;"></div></td>
-                <td><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 70px; height: 26px; border-radius: 8px;"></div></td>
-                <td><div class="skeleton" style="width: 24px; height: 24px; border-radius: 6px;"></div></td>
+                <td :data-label="$t('payments.monthColumn')"><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
+                <td :data-label="$t('payments.commentColumn')"><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
+                <td :data-label="$t('payments.receiptColumn')"><div class="skeleton" style="width: 90px; height: 24px; border-radius: 6px;"></div></td>
+                <td :data-label="$t('payments.amountColumn')"><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
+                <td :data-label="$t('payments.methodColumn')"><div class="skeleton" style="width: 70px; height: 26px; border-radius: 8px;"></div></td>
+                <td :data-label="$t('payments.dateColumn')"><div class="skeleton" style="width: 24px; height: 24px; border-radius: 6px;"></div></td>
+                <td :data-label="$t('payments.statusColumn')"><div class="skeleton" style="width: 70px; height: 26px; border-radius: 8px;"></div></td>
+                <td :data-label="$t('common.actions') || 'Actions'"><div class="skeleton" style="width: 24px; height: 24px; border-radius: 6px;"></div></td>
               </tr>
             </template>
 
             <!-- Real Data -->
             <template v-else>
               <tr v-for="item in paginatedPayments" :key="item.id">
-               <td>
+               <td :data-label="$t('payments.studentColumn')">
                 <div class="student-info">
                   <div class="avatar">{{ item.student?.charAt(0) || '?' }}</div>
                   <div class="details">
@@ -511,23 +513,23 @@ const getMethodIcon = (method) => {
                   </div>
                 </div>
               </td>
-              <td class="table-month-cell"><span class="month-label">{{ item.month || '-' }}</span></td>
-              <td class="table-comment-cell">{{ (item.comment || '').replace(/\[M:[^\]]+\]/g, '').replace(/\[DAYS:[^\]]+\]/g, '').trim() || '' }}</td>
-              <td><code>{{ item.receiptId }}</code></td>
-              <td><span class="amount">{{ formatCurrency(item.amount) }}</span></td>
-              <td>
+              <td class="table-month-cell" :data-label="$t('payments.monthColumn')"><span class="month-label">{{ item.month || '-' }}</span></td>
+              <td class="table-comment-cell" :data-label="$t('payments.commentColumn')">{{ (item.comment || '').replace(/\[M:[^\]]+\]/g, '').replace(/\[DAYS:[^\]]+\]/g, '').trim() || '' }}</td>
+              <td :data-label="$t('payments.receiptColumn')"><code>{{ item.receiptId }}</code></td>
+              <td :data-label="$t('payments.amountColumn')"><span class="amount">{{ formatCurrency(item.amount) }}</span></td>
+              <td :data-label="$t('payments.methodColumn')">
                 <div class="method-tag">
                   <span class="icon">{{ getMethodIcon(item.method) }}</span>
                   {{ $t('payments.method' + item.method) }}
                 </div>
               </td>
-              <td class="table-date-cell">{{ formatDate(item.date) }}</td>
-              <td>
+              <td class="table-date-cell" :data-label="$t('payments.dateColumn')">{{ formatDate(item.date) }}</td>
+              <td :data-label="$t('payments.statusColumn')">
                 <span :class="['status-badge', getStatusClass(item.status)]">
                   {{ item.status }}
                 </span>
               </td>
-              <td>
+              <td :data-label="$t('common.actions') || 'Actions'">
                 <div class="row-actions">
                   <button class="btn-icon export-btn" @click="openDetailsModal(item)" :title="$t('common.export')">
                     <Download :size="18" />

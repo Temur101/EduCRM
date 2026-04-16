@@ -337,14 +337,14 @@ const avatarUrl = (name) =>
             <!-- Skeleton -->
             <template v-if="isLoading">
               <tr v-for="i in 6" :key="i">
-                <td><div class="skeleton" style="width:160px;height:16px"></div></td>
-                <td><div class="skeleton" style="width:100px;height:16px"></div></td>
-                <td><div class="skeleton" style="width:80px;height:16px"></div></td>
-                <td><div class="skeleton" style="width:90px;height:16px"></div></td>
-                <td><div class="skeleton" style="width:100px;height:16px"></div></td>
-                <td><div class="skeleton" style="width:80px;height:24px;border-radius:8px"></div></td>
-                <td><div class="skeleton" style="width:130px;height:16px"></div></td>
-                <td></td>
+                <td :data-label="$t('reminders.student')"><div class="skeleton" style="width:160px;height:16px"></div></td>
+                <td :data-label="$t('reminders.group')"><div class="skeleton" style="width:100px;height:16px"></div></td>
+                <td :data-label="$t('students.month')"><div class="skeleton" style="width:80px;height:16px"></div></td>
+                <td :data-label="$t('reminders.amount')"><div class="skeleton" style="width:90px;height:16px"></div></td>
+                <td :data-label="$t('reminders.promisedDate')"><div class="skeleton" style="width:100px;height:16px"></div></td>
+                <td :data-label="$t('reminders.status')"><div class="skeleton" style="width:80px;height:24px;border-radius:8px"></div></td>
+                <td :data-label="$t('reminders.notes')"><div class="skeleton" style="width:130px;height:16px"></div></td>
+                <td :data-label="$t('common.actions') || 'Actions'"></td>
               </tr>
             </template>
 
@@ -364,7 +364,7 @@ const avatarUrl = (name) =>
                 :class="{ 'row-overdue': computedStatus(item) === 'overdue' }"
               >
                 <!-- Student -->
-                <td>
+                <td :data-label="$t('reminders.student')">
                   <div class="student-cell">
                     <img :src="avatarUrl(item.students?.name)" class="mini-avatar" :alt="item.students?.name" />
                     <div>
@@ -374,41 +374,41 @@ const avatarUrl = (name) =>
                   </div>
                 </td>
                 <!-- Group -->
-                <td>
+                <td :data-label="$t('reminders.group')">
                   <div class="group-cell">
                     <Users :size="13" style="color:#94A3B8;flex-shrink:0" />
                     {{ item.students?.groups?.name || $t('reminders.noGroup') }}
                   </div>
                 </td>
                 <!-- Month -->
-                <td>
+                <td :data-label="$t('students.month')">
                    <span class="month-text">{{ getDisplayMonth(item) }}</span>
                 </td>
                 <!-- Amount -->
-                <td>
+                <td :data-label="$t('reminders.amount')">
                   <span class="amount-text">{{ formatCurrency(item.amount) }}</span>
                 </td>
                 <!-- Date -->
-                <td>
+                <td :data-label="$t('reminders.promisedDate')">
                   <div class="date-cell" :class="{ 'date-danger': computedStatus(item) === 'overdue' }">
                     <CalendarClock :size="14" style="flex-shrink:0" />
                     {{ formatDate(item.promised_date) }}
                   </div>
                 </td>
                 <!-- Status badge — computed from date -->
-                <td>
+                <td :data-label="$t('reminders.status')">
                   <span :class="['status-badge', statusClass(item)]">
                     {{ statusLabel(item) }}
                   </span>
                 </td>
                 <!-- Notes -->
-                <td>
+                <td :data-label="$t('reminders.notes')">
                   <span class="notes-text">
                     {{ (item.notes || '').replace(/\[M:[^\]]+\]/g, '').replace(/\[DAYS:[^\]]+\]/g, '').trim() || '' }}
                   </span>
                 </td>
                 <!-- Actions -->
-                <td>
+                <td :data-label="$t('common.actions') || 'Actions'">
                   <div class="actions-cell">
                     <button
                       v-if="computedStatus(item) !== 'paid'"

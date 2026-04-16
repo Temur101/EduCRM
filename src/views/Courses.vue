@@ -255,7 +255,7 @@ const getStatusClass = (status) => {
           <tbody>
             <template v-if="isLoading">
               <tr v-for="i in 5" :key="i">
-                <td>
+                <td :data-label="$t('courses.name')">
                   <div class="course-info">
                     <div class="skeleton" style="width: 40px; height: 40px; border-radius: 12px;"></div>
                     <div class="details">
@@ -264,9 +264,9 @@ const getStatusClass = (status) => {
                     </div>
                   </div>
                 </td>
-                <td><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 120px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 24px; height: 24px; border-radius: 6px;"></div></td>
+                <td :data-label="$t('courses.category')"><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
+                <td :data-label="$t('courses.price')"><div class="skeleton" style="width: 120px; height: 16px;"></div></td>
+                <td :data-label="$t('common.actions') || 'Actions'"><div class="skeleton" style="width: 24px; height: 24px; border-radius: 6px;"></div></td>
               </tr>
             </template>
 
@@ -275,7 +275,7 @@ const getStatusClass = (status) => {
                 <td colspan="4" class="no-data">{{ $t('common.noData') }}</td>
               </tr>
               <tr v-for="item in paginatedCourses" :key="item.id">
-                <td>
+                <td :data-label="$t('courses.name')">
                   <div class="course-info">
                     <div class="course-icon-bg">
                       <BookOpen :size="20" />
@@ -285,14 +285,14 @@ const getStatusClass = (status) => {
                     </div>
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('courses.category')">
                   <div class="category-tag">
                     <Tag :size="14" />
                     {{ item.category }}
                   </div>
                 </td>
-                <td><span class="price-value">{{ formatCurrency(item.price) }}</span></td>
-                <td>
+                <td :data-label="$t('courses.price')"><span class="price-value">{{ formatCurrency(item.price) }}</span></td>
+                <td :data-label="$t('common.actions') || 'Actions'">
                   <div class="dropdown-wrapper">
                     <button 
                       class="btn-icon-more" 

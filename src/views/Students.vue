@@ -343,7 +343,7 @@ const formatDate = (dateStr) => {
           <tbody>
             <template v-if="isLoading">
               <tr v-for="i in 5" :key="i">
-                <td>
+                <td :data-label="$t('students.name')">
                   <div class="student-info">
                     <div class="skeleton" style="width: 40px; height: 40px; border-radius: 50%;"></div>
                     <div class="details">
@@ -351,12 +351,12 @@ const formatDate = (dateStr) => {
                     </div>
                   </div>
                 </td>
-                <td><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
-                <td><div class="skeleton" style="width: 70px; height: 26px; border-radius: 8px;"></div></td>
-                <td>
+                <td :data-label="$t('students.phone')"><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
+                <td :data-label="$t('students.group')"><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
+                <td :data-label="$t('students.course')"><div class="skeleton" style="width: 100px; height: 16px;"></div></td>
+                <td :data-label="$t('students.addedDate')"><div class="skeleton" style="width: 80px; height: 16px;"></div></td>
+                <td :data-label="$t('students.status')"><div class="skeleton" style="width: 70px; height: 26px; border-radius: 8px;"></div></td>
+                <td :data-label="$t('common.actions')">
                   <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                     <div class="skeleton" style="width: 32px; height: 32px; border-radius: 8px;"></div>
                     <div v-if="userRole === 'admin'" class="skeleton" style="width: 32px; height: 32px; border-radius: 8px;"></div>
@@ -370,7 +370,7 @@ const formatDate = (dateStr) => {
                 <td :colspan="7" class="no-data">{{ $t('common.noData') }}</td>
               </tr>
               <tr v-for="item in paginatedStudents" :key="item.id">
-                <td>
+                <td :data-label="$t('students.name')">
                   <div class="student-info">
                     <div class="student-avatar">
                       <img :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=7366FF&color=fff`" :alt="item.name">
@@ -383,7 +383,7 @@ const formatDate = (dateStr) => {
                     </div>
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('students.phone')">
                   <div class="phone-column">
                     <div class="phone-item main">
                       <Phone :size="14" />
@@ -395,7 +395,7 @@ const formatDate = (dateStr) => {
                     </div>
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('students.group')">
                   <div class="group-tag clickable" v-if="!item.isTeacher" @click="goToGroup(item.group_id)">
                     <Users :size="14" />
                     {{ item.groups?.name || '-' }}
@@ -404,21 +404,21 @@ const formatDate = (dateStr) => {
                     {{ item.subject || '-' }}
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('students.course')">
                   <span class="course-name">{{ item.isTeacher ? 'Staff' : (item.groups?.courses?.name || '-') }}</span>
                 </td>
-                <td>
+                <td :data-label="$t('students.addedDate')">
                   <div class="date-info">
                     <Calendar :size="14" />
                     {{ formatDate(item.created_at) }}
                   </div>
                 </td>
-                <td>
+                <td :data-label="$t('students.status')">
                   <span :class="['status-badge', getStatusClass(item.status)]">
                     {{ $t('students.' + item.status.toLowerCase()) }}
                   </span>
                 </td>
-                <td>
+                <td :data-label="$t('common.actions')">
                   <div class="actions-group" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem;">
                     <template v-if="!item.isTeacher">
                       <button class="btn-view-action" @click="goToStudentDetail(item.id)">
