@@ -713,8 +713,8 @@ const getMethodIcon = (method) => {
 /* Stats Cards */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.25rem;
   margin-bottom: 2rem;
 }
 
@@ -748,10 +748,12 @@ const getMethodIcon = (method) => {
 }
 
 .stat-value {
-  font-size: 1.5rem;
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
   font-weight: 800;
   color: var(--dark);
   margin: 0.25rem 0;
+  word-break: break-word;
+  line-height: 1.2;
 }
 
 .stat-trend {
@@ -775,11 +777,13 @@ const getMethodIcon = (method) => {
 }
 
 .table-header {
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .search-bar {
@@ -790,7 +794,9 @@ const getMethodIcon = (method) => {
   padding: 0.6rem 1rem;
   border-radius: 12px;
   width: 100%;
-  max-width: 350px;
+  max-width: 320px;
+  min-width: 0;
+  flex: 1;
 }
 
 .search-bar input {
@@ -816,6 +822,8 @@ const getMethodIcon = (method) => {
   padding: 0.35rem;
   border-radius: 12px;
   border: 1px solid var(--border);
+  flex-wrap: wrap;
+  width: 100%;
 }
 
 .date-input {
@@ -836,7 +844,8 @@ const getMethodIcon = (method) => {
   font-weight: 600;
   color: var(--dark);
   font-family: inherit;
-  width: 105px;
+  width: 100px;
+  min-width: 0;
 }
 
 .date-separator {
@@ -883,8 +892,10 @@ const getMethodIcon = (method) => {
 }
 
 .table-scroll-wrapper {
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: visible;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table-scroll-wrapper::-webkit-scrollbar {
@@ -925,6 +936,8 @@ td {
   padding: 0.9rem 1rem;
   border-bottom: 1px solid #F1F5F9;
   vertical-align: middle;
+  word-wrap: break-word;
+  white-space: normal;
 }
 
 .student-info {
@@ -1407,5 +1420,53 @@ td {
   background: var(--light);
   border: none;
   cursor: pointer;
+}
+
+/* ── Payments Responsive ─────────────────────────────────────── */
+@media (max-width: 767px) {
+  .table-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem;
+  }
+  .search-bar {
+    max-width: 100%;
+  }
+  .table-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .date-filter-group {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .date-input {
+    flex: 1;
+    min-width: 130px;
+  }
+  .date-input input {
+    width: 100%;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
+  }
+  .payments-page {
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 1rem;
+  }
+  .stat-card {
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+  .table-scroll-wrapper table {
+    min-width: 800px;
+  }
 }
 </style>

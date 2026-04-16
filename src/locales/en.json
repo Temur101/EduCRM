@@ -45,6 +45,7 @@
         "endDate": "End Date"
     },
     "leads": {
+        "moveToTodayTooltip": "Move to Today",
         "title": "Leads",
         "newLeadModalTitle": "Add New Lead",
         "namePlaceholder": "e.g. John Smith",
@@ -400,6 +401,7 @@
         "lessonDays": "Lesson Days"
     },
     "common": {
+        "addedDate": "Added Date",
         "search": "Search",
         "searchPlaceholder": "Search in EduCRM (CTRL + /)",
         "add": "Add",

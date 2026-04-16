@@ -45,6 +45,7 @@
         "endDate": "Tugash sanasi"
     },
     "leads": {
+        "moveToTodayTooltip": "Bugungi kunga o'tkazish",
         "title": "Lidlar",
         "newLeadModalTitle": "Yangi lid qo'shish",
         "namePlaceholder": "masalan, Ali Toshmatov",
@@ -436,6 +437,7 @@
         "lessonDays": "Dars kunlari"
     },
     "common": {
+        "addedDate": "Qo'shilgan sana",
         "search": "Qidirish",
         "searchPlaceholder": "CRM'dan qidirish (CTRL + /)",
         "add": "Qo'shish",

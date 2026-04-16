@@ -15,7 +15,8 @@ import {
   Loader2,
   BookOpen,
   Globe,
-  Zap
+  Zap,
+  Send
 } from 'lucide-vue-next';
 import { ref, reactive, nextTick, onMounted, onUnmounted } from 'vue';
 import draggable from 'vuedraggable';

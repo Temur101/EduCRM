@@ -45,6 +45,7 @@
         "endDate": "Дата окончания"
     },
     "leads": {
+        "moveToTodayTooltip": "Переместить на Сегодня",
         "title": "Лиды",
         "newLeadModalTitle": "Добавить нового лида",
         "namePlaceholder": "например, Иван Иванов",
@@ -466,6 +467,7 @@
         "days": "{n} дн."
     },
     "common": {
+        "addedDate": "Дата добавления",
         "search": "Поиск",
         "searchPlaceholder": "Поиск по CRM (CTRL + /)",
         "add": "Добавить",

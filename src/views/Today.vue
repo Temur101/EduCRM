@@ -14,7 +14,9 @@ import {
   Zap,
   Phone,
   Globe,
-  BookOpen
+  BookOpen,
+  Edit,
+  Save
 } from 'lucide-vue-next';
 import { ref, reactive, nextTick, onMounted, onUnmounted, computed } from 'vue';
 import draggable from 'vuedraggable';

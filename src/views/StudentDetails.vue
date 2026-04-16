@@ -1082,6 +1082,7 @@ const onPaymentSuccess = () => {
   padding: 2rem;
   background: #f8fafc;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .page-header {
@@ -1134,17 +1135,19 @@ const onPaymentSuccess = () => {
 
 /* Hero Section */
 .profile-hero {
-  padding: 2rem;
+  padding: 1.5rem;
   background: white;
   margin-bottom: 2rem;
   border-radius: 24px;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+  overflow: hidden;
 }
 
 .profile-main {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .avatar-container {
@@ -1152,11 +1155,13 @@ const onPaymentSuccess = () => {
 }
 
 .profile-avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: 30px;
+  width: 90px;
+  height: 90px;
+  border-radius: 22px;
   object-fit: cover;
   border: 4px solid #f1f5f9;
+  flex-shrink: 0;
+  display: block;
 }
 
 .status-dot {
@@ -1172,11 +1177,16 @@ const onPaymentSuccess = () => {
 .status-dot.active { background: #22c55e; }
 .status-dot.left { background: #ef4444; }
 
+.profile-info {
+  flex: 1;
+  min-width: 0;
+}
 .profile-info h1 {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: #1e293b;
   margin-bottom: 0.25rem;
+  word-break: break-word;
 }
 
 .name-row {
@@ -1194,7 +1204,8 @@ const onPaymentSuccess = () => {
 
 .quick-stats {
   display: flex;
-  gap: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .q-stat {
@@ -1209,11 +1220,11 @@ const onPaymentSuccess = () => {
 /* Grid Layout */
 .details-grid {
   display: grid;
-  grid-template-columns: 350px 1fr;
-  gap: 2rem;
+  grid-template-columns: 340px 1fr;
+  gap: 1.5rem;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1100px) {
   .details-grid {
     grid-template-columns: 1fr;
   }
@@ -2090,8 +2101,10 @@ td {
 .att-calendar {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 5px;
+  gap: 4px;
   margin-bottom: 1.5rem;
+  min-width: 0;
+  overflow: hidden;
 }
 .att-dow {
   text-align: center;
@@ -2784,4 +2797,56 @@ td {
   box-shadow: 0 8px 20px rgba(124,58,237,0.35);
 }
 .btn-promise-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── StudentDetails Mobile ──────────────────────────────────── */
+@media (max-width: 767px) {
+  .student-details-page { padding: 1rem; }
+
+  /* Profile hero */
+  .profile-hero { padding: 1rem; border-radius: 16px; }
+  .profile-main { gap: 1rem; }
+  .profile-avatar { width: 72px; height: 72px; border-radius: 16px; }
+  .profile-info h1 { font-size: 1.2rem; }
+  .name-row { flex-wrap: wrap; gap: 0.5rem; }
+  .quick-stats { gap: 0.75rem; }
+  .q-stat { font-size: 0.8rem; }
+
+  /* Content grid */
+  .details-grid { grid-template-columns: 1fr; gap: 1rem; }
+  .details-column { gap: 1rem; }
+  .card { padding: 1rem; border-radius: 16px; }
+
+  /* Attendance nav — ensure it doesn't overflow */
+  .section-header { flex-wrap: wrap; gap: 0.75rem; }
+  .att-month-nav { flex-shrink: 0; }
+  .att-month-label { min-width: 90px; font-size: 0.8rem; }
+
+  /* Attendance calendar — smaller cells */
+  .att-calendar { gap: 3px; margin-bottom: 1rem; }
+  .att-day {
+    border-radius: 6px;
+    border-width: 1px;
+  }
+  .att-day-num { font-size: 0.65rem; }
+  .att-day-icon { font-size: 0.55rem; }
+  .att-dow { font-size: 0.58rem; padding-bottom: 0.2rem; }
+
+  /* Attendance stats */
+  .att-stats { gap: 0.5rem; }
+  .att-stat { padding: 0.45rem 0.6rem; min-width: 70px; border-radius: 10px; }
+  .att-stat-num { font-size: 1.1rem; }
+  .att-stat-label { font-size: 0.6rem; }
+
+  /* Disable card hover lift on mobile (can cause glitches) */
+  .card:hover { transform: none; }
+  .billing-month-card:hover { transform: none; }
+
+  /* Table (payments history) */
+  .table-wrapper { overflow-x: auto; }
+  .table-section.card { padding: 1rem 0.5rem; }
+
+  /* Discount presets */
+  .discount-presets { gap: 0.25rem; }
+  .preset-btn { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+}
 </style>
