@@ -29,7 +29,7 @@ const activePriority = ref('All');
 const isSubmitting = ref(false);
 const isSubmittingStage = ref(false);
 const deletingLeadId = ref(null);
-const movingLeadId = ref(null);
+
 
 const toggleDropdown = (id, event) => {
   event.stopPropagation();
@@ -128,63 +128,7 @@ const deleteLead = async (boardId, leadId) => {
   }
 };
 
-const moveLeadToToday = async (lead) => {
-  if (movingLeadId.value) return;
-  movingLeadId.value = lead.id;
-  try {
-    const TODAY_BOARD_TITLE = "Today task list";
-    // 1. Find or create the Today board
-    let { data: todayBoard, error: boardErr } = await supabase
-      .from('boards')
-      .select('id, title, color')
-      .eq('title', TODAY_BOARD_TITLE)
-      .maybeSingle();
 
-    if (boardErr || !todayBoard) {
-      const { data: newBoard, error: createErr } = await supabase
-        .from('boards')
-        .insert([{ 
-          id: crypto.randomUUID(), 
-          title: TODAY_BOARD_TITLE, 
-          color: '#7366FF',
-          created_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
-      if (createErr) throw createErr;
-      todayBoard = newBoard;
-    }
-
-    // 2. Create a task based on this lead
-    const creationDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const dbTask = {
-      id: crypto.randomUUID(),
-      board_id: todayBoard.id,
-      title: lead.name,
-      description: `[LEAD_DATA]${JSON.stringify({ 
-        initials: lead.initials, 
-        avatarColor: lead.avatarColor, 
-        phone: lead.phone, 
-        phone2: lead.phone2,
-        source: lead.source,
-        interest: lead.interest,
-        leadPriority: lead.priority
-      })}[/LEAD_DATA]\n${lead.description || ''}`,
-      priority: 'High', // Backend priority level
-      due_date: creationDate,
-      progress: 0,
-      comments_list: []
-    };
-
-    const { error: taskErr } = await supabase.from('tasks').insert([dbTask]);
-    if (taskErr) throw taskErr;
-
-  } catch (e) {
-    console.error('Error moving lead to today:', e);
-  } finally {
-    movingLeadId.value = null;
-  }
-};
 
 // --- Lead Modal State ---
 const showLeadModal = ref(false);
@@ -601,16 +545,7 @@ const handleDragChange = async (event, stageId) => {
                         <MessageSquare :size="15" /> {{ lead.commentsList ? lead.commentsList.length : (lead.comments ?? 0) }}
                       </button>
                     </div>
-                    <button 
-                      class="btn-move-today ml-auto" 
-                      @click="moveLeadToToday(lead)"
-                      :disabled="movingLeadId === lead.id"
-                      :title="$t('leads.moveToTodayTooltip')"
-                    >
-                      <Loader2 v-if="movingLeadId === lead.id" :size="14" class="spin" />
-                      <Zap v-else :size="14" /> 
-                      {{ movingLeadId === lead.id ? $t('common.loading') : $t('leads.moveToToday') }}
-                    </button>
+
                   </div>
                 </div>
               </template>
@@ -1930,27 +1865,7 @@ const handleDragChange = async (event, stageId) => {
   color: var(--primary);
 }
 
-.btn-move-today {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.8rem;
-  background: var(--primary-light);
-  color: var(--primary);
-  border: none;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-}
 
-.btn-move-today:hover {
-  background: var(--primary);
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(115, 102, 255, 0.2);
-}
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

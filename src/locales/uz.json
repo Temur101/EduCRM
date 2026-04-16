@@ -58,7 +58,7 @@
         "hot": "Issiq",
         "warm": "Iliq",
         "cold": "Sovuq",
-        "moveToToday": "Bugunga ko'chirish",
+
         "details": "Tafsilotlar",
         "delete": "O'chirish",
         "name": "To'liq ism",
@@ -89,7 +89,7 @@
         "send": "Yuborish",
         "noDescription": "Ushbu lid uchun tavsif berilmagan.",
         "newLeadBtn": "Yangi lid",
-        "moveToTodayTooltip": "Bugungi ro'yxatga o'tkazish",
+
         "loading": "Yuklanmoqda..."
     },
     "tasks": {
@@ -181,7 +181,8 @@
         "commentColumn": "Izoh",
         "confirmBtn": "To'lovni tasdiqlash",
         "expected": "Kutilayotgan to'lovlar",
-        "activeReminders": "Faol eslatmalar"
+        "activeReminders": "Faol eslatmalar",
+        "details": "To'lov tafsilotlari"
     },
     "archive": {
         "title": "Arxivlar",
@@ -457,12 +458,12 @@
         "password": "Parol",
         "passwordPlaceholder": "Xavfsiz parolni kiriting",
         "day": "kun",
-        "day": "kun",
         "cancel": "Bekor qilish",
         "all": "Hammasi",
         "clear": "Tozalash",
         "success": "Muvaffaqiyatli!",
-        "error": "Xatolik"
+        "error": "Xatolik",
+        "downloadPDF": "PDF yuklab olish"
     },
     "attendance": {
         "title": "Davomat",
@@ -501,7 +502,13 @@
         "namePlaceholder": "Ismni kiriting",
         "createModalTitle": "Yangi foydalanuvchi yaratish",
         "editModalTitle": "Foydalanuvchini tahrirlash",
-        "deleteConfirm": "Ushbu foydalanuvchi arxivlanadi va ro'yxatdan o'chiriladi."
+        "deleteConfirm": "Ushbu foydalanuvchi arxivlanadi va ro'yxatdan o'chiriladi.",
+        "teacherSubject": "O'rgatadigan fani",
+        "teacherSubjectPlaceholder": "masalan, Ingliz tili, Dasturlash",
+        "teacherQualification": "Malakasi / Tajribasi",
+        "teacherQualificationPlaceholder": "masalan, IELTS 8.5, 5 yillik tajriba",
+        "teacherSchedule": "Ish grafigi",
+        "teacherSchedulePlaceholder": "masalan, Dush-Jum 9:00 - 18:00"
     },
     "roles": {
         "admin": "Admin",

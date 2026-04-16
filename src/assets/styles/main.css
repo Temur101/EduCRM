@@ -159,55 +159,234 @@ h4 {
   animation: spin 1s linear infinite;
 }
 
-/* Mobile & Tablet Responsive Queries */
-@media (max-width: 991px) {
+/* =========================================================================
+   GLOBAL RESPONSIVE RULES 
+   Mobile: < 768px | Tablet: 768px - 1024px | Desktop: > 1024px
+========================================================================= */
+
+/* ALL inputs and buttons minimum 44px height for comfortable touch */
+input, select, textarea, button.btn, .nav-btn, .btn-icon, button.dropdown-item, .checkbox-card {
+  min-height: 44px;
+}
+
+/* Prevent horizontal scroll globally */
+html, body, .app-container {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Modals - General limits for desktop */
+.modal-box {
+  width: 100%;
+  max-width: 600px;
+}
+.confirm-modal {
+  max-width: 400px !important;
+}
+
+/* Chart/Graph containers */
+.chart-container, canvas, .recharts-wrapper {
+  width: 100% !important;
+  max-width: 100%;
+}
+img, svg {
+  max-width: 100%;
+}
+
+/* -------------------------------------------------------------------------
+   TABLET & MOBILE (< 1024px) 
+   Forms: Single-column full-width
+------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .form-row {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   TABLET SPECIFIC (768px - 1024px)
+------------------------------------------------------------------------- */
+@media (min-width: 768px) and (max-width: 1024px) {
   :root {
-    --sidebar-width: 0px;
+    --sidebar-width: 80px; 
   }
   
   .container {
     padding: 1.5rem;
   }
   
-  .card {
-    padding: 1.25rem;
+  /* Modal Windows */
+  .modal-box {
+    width: 90vw !important;
+    max-width: 90vw !important;
+  }
+
+  /* Data Tables: Horizontal scroll */
+  .table-scroll-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Dashboard Cards: 2 Columns */
+  .stats-grid, .groups-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 
-@media (max-width: 768px) {
-  .container {
-    padding: 1rem;
+/* -------------------------------------------------------------------------
+   MOBILE SPECIFIC (< 768px)
+------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  :root {
+    --sidebar-width: 0px; 
   }
   
-  .stats-grid {
+  .container, .page-header {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .card {
+    padding: 1rem;
+  }
+
+  /* Typography */
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+  body { font-size: 0.9rem; }
+
+  /* Buttons & Actions */
+  .btn-primary, .btn-danger-confirm, .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1rem;
+  }
+
+  /* Dashboard Cards: 1 Column */
+  .stats-grid, .groups-grid {
     grid-template-columns: 1fr !important;
   }
   
   .dashboard-content-grid {
     grid-template-columns: 1fr !important;
   }
+
+  .search-bar, .search-box {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Modals: Fullscreen, slides up from bottom */
+  .modal-overlay {
+    align-items: flex-end !important; /* Push to bottom */
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+  .modal-box {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+    animation: slideUp 0.3s ease-out forwards;
+    display: flex !important;
+    flex-direction: column !important;
+  }
   
-  .search-box {
-    width: 200px !important;
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-body {
+    overflow-y: auto !important;
+    flex: 1 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  .modal-footer {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* Data Tables: Card Layout */
+  .table-scroll-wrapper {
+    overflow: hidden !important; 
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+  table { 
+    display: block !important; 
+    width: 100% !important; 
+    min-width: 0 !important; /* Overrides local 900px */
+    max-width: 100vw !important;
+  }
+  thead {
+    display: none !important; /* Hide headers */
+  }
+  tbody {
+    display: block !important;
+    width: 100% !important;
+  }
+  tr {
+    display: block !important;
+    width: 100% !important;
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--white);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  td {
+    display: flex !important;
+    width: 100% !important;
+    border-bottom: 1px dotted var(--border) !important;
+    padding: 0.75rem 0 !important;
+    justify-content: space-between;
+    align-items: center;
+    text-align: right;
+    box-sizing: border-box;
+  }
+  td:last-child {
+    border-bottom: none !important;
+  }
+  
+  /* Action columns (dropdowns, buttons) should be full width or at the bottom */
+  td:has(.actions-wrapper), td:has(.dropdown-wrapper) {
+    justify-content: flex-end !important;
   }
 }
 
+/* Visibility Utilities */
 .mobile-only {
-  display: none;
+  display: none !important;
 }
-
-@media (max-width: 991px) {
+@media (max-width: 767px) {
   .mobile-only {
-    display: flex;
+    display: flex !important;
+  }
+  .desktop-only {
+    display: none !important;
   }
 }
 
-.desktop-only {
-  display: flex;
-}
-
-@media (max-width: 991px) {
+@media (min-width: 768px) and (max-width: 1024px) {
+  .tablet-only {
+    display: flex !important;
+  }
   .desktop-only {
-    display: none;
+    display: none !important; 
   }
 }

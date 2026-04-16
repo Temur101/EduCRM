@@ -24,6 +24,7 @@ import { useI18n } from 'vue-i18n';
 import { supabase } from '../supabase.js';
 
 const { t } = useI18n();
+const userRole = ref(localStorage.getItem('userRole') || 'regular');
 
 const reminders = ref([]);
 const isLoading = ref(true);
@@ -421,12 +422,13 @@ const avatarUrl = (name) =>
                     </button>
 
                     <button
-                      class="btn-delete-quick"
-                      @click="confirmDelete(item.id)"
-                      :title="$t('common.delete')"
-                    >
-                      <Trash2 :size="15" />
-                    </button>
+                       v-if="userRole === 'admin'"
+                       class="btn-delete-quick"
+                       @click="confirmDelete(item.id)"
+                       :title="$t('common.delete')"
+                     >
+                       <Trash2 :size="15" />
+                     </button>
                   </div>
                 </td>
               </tr>

@@ -58,7 +58,7 @@
         "hot": "Горячий",
         "warm": "Теплый",
         "cold": "Холодный",
-        "moveToToday": "Перенести на сегодня",
+
         "details": "Детали",
         "delete": "Удалить",
         "name": "Полное имя",
@@ -89,7 +89,7 @@
         "send": "Отправить",
         "noDescription": "Описание для этого лида отсутствует.",
         "newLeadBtn": "Новый лид",
-        "moveToTodayTooltip": "Переместить в Список на сегодня",
+
         "loading": "Загрузка..."
     },
     "tasks": {
@@ -181,7 +181,8 @@
         "commentColumn": "Комментарий",
         "confirmBtn": "Подтвердить оплату",
         "expected": "Ожидаемые платежи",
-        "activeReminders": "Активные напоминания"
+        "activeReminders": "Активные напоминания",
+        "details": "Детали платежа"
     },
     "archive": {
         "title": "Архивы",
@@ -321,7 +322,13 @@
         "namePlaceholder": "Введите имя пользователя",
         "createModalTitle": "Создать новую учетную запись",
         "editModalTitle": "Редактировать учетную запись",
-        "deleteConfirm": "Этот пользователь будет архивирован, а доступ к его учетной записи будет отозван."
+        "deleteConfirm": "Этот пользователь будет архивирован, а доступ к его учетной записи будет отозван.",
+        "teacherSubject": "Предмет преподавания",
+        "teacherSubjectPlaceholder": "например, Английский язык, Программирование",
+        "teacherQualification": "Квалификация / Опыт",
+        "teacherQualificationPlaceholder": "например, IELTS 8.5, 5 лет опыта",
+        "teacherSchedule": "График работы",
+        "teacherSchedulePlaceholder": "например, Пн-Пт 9:00 - 18:00"
     },
     "roles": {
         "admin": "Админ",
@@ -484,7 +491,8 @@
         "all": "Все",
         "clear": "Очистить",
         "success": "Успешно!",
-        "error": "Ошибка"
+        "error": "Ошибка",
+        "downloadPDF": "Скачать PDF"
     },
     "attendance": {
         "title": "Посещаемость",

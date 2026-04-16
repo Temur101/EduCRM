@@ -58,7 +58,7 @@
         "hot": "Hot",
         "warm": "Warm",
         "cold": "Cold",
-        "moveToToday": "Move to Today",
+
         "details": "Details",
         "delete": "Delete",
         "name": "Full Name",
@@ -89,7 +89,7 @@
         "send": "Send",
         "noDescription": "No description provided for this lead.",
         "newLeadBtn": "New Lead",
-        "moveToTodayTooltip": "Move to Today",
+
         "loading": "Loading..."
     },
     "tasks": {
@@ -179,7 +179,8 @@
         "commentColumn": "Comment",
         "confirmBtn": "Confirm Payment",
         "expected": "Expected Payments",
-        "activeReminders": "Active Promises/Reminders"
+        "activeReminders": "Active Promises/Reminders",
+        "details": "Payment Details"
     },
     "archive": {
         "title": "Archives",
@@ -425,7 +426,8 @@
         "day": "day",
         "cancel": "Cancel",
         "all": "All",
-        "clear": "Clear"
+        "clear": "Clear",
+        "downloadPDF": "Download PDF"
     },
     "attendance": {
         "title": "Attendance",
@@ -464,7 +466,13 @@
         "namePlaceholder": "Enter user name",
         "createModalTitle": "Create New User Account",
         "editModalTitle": "Edit User Account",
-        "deleteConfirm": "This user will be archived and their account access will be revoked."
+        "deleteConfirm": "This user will be archived and their account access will be revoked.",
+        "teacherSubject": "Teaching Subject",
+        "teacherSubjectPlaceholder": "e.g. English, Programming",
+        "teacherQualification": "Qualification / Experience",
+        "teacherQualificationPlaceholder": "e.g. IELTS 8.5, 5 years exp",
+        "teacherSchedule": "Work Schedule",
+        "teacherSchedulePlaceholder": "e.g. Mon-Fri 9:00 - 18:00"
     },
     "roles": {
         "admin": "Admin",

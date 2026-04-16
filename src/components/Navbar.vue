@@ -128,7 +128,7 @@ onUnmounted(() => {
   display: none;
 }
 
-@media (max-width: 991px) {
+@media (max-width: 767px) {
   .mobile-toggle {
     display: flex;
   }

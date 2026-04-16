@@ -41,7 +41,7 @@ const menuItems = [
   { key: 'sidebar.staff', path: '/staff', icon: ShieldCheck },
 ];
 
-const adminOnlyKeys = ['sidebar.payments', 'sidebar.reminders', 'sidebar.archive', 'sidebar.botManager', 'sidebar.staff'];
+const adminOnlyKeys = ['sidebar.archive', 'sidebar.botManager', 'sidebar.staff'];
 const teacherHiddenKeys = [
   'sidebar.dashboard',
   'sidebar.leads', 
@@ -141,7 +141,40 @@ const handleLogout = () => {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@media (max-width: 991px) {
+@media (min-width: 768px) and (max-width: 1024px) {
+  .sidebar {
+    width: var(--sidebar-width);
+  }
+  .sidebar .name {
+    display: none;
+  }
+  .sidebar .arrow {
+    display: none;
+  }
+  .sidebar .section-title {
+    opacity: 0;
+  }
+  .sidebar .user-info {
+    justify-content: center;
+  }
+  .sidebar .user-info > div:not(.user-avatar-placeholder) {
+    display: none;
+  }
+  .nav-item {
+    justify-content: center;
+    padding: 0.75rem 0;
+  }
+  .icon {
+    margin-right: 0;
+  }
+  .logout-menu {
+    left: 0.5rem;
+    right: auto;
+    width: 200px;
+  }
+}
+
+@media (max-width: 767px) {
   .sidebar {
     transform: translateX(-100%);
     box-shadow: 10px 0 25px rgba(0,0,0,0.1);

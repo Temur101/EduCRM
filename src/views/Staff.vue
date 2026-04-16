@@ -16,12 +16,15 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
-  Lock
+  Lock,
+  Check,
+  Users
 } from 'lucide-vue-next';
 import { ref, reactive, computed, onMounted } from 'vue';
 import { supabase } from '../supabase.js';
 
 const staff = ref([]);
+const allGroups = ref([]);
 const isLoading = ref(true);
 const isSubmitting = ref(false);
 const deletingStaffId = ref(null);
@@ -48,13 +51,18 @@ const loadData = async () => {
       .order('created_at', { ascending: false });
     
     if (error) {
-       // If table doesn't exist, we might get an error.
-       // For now, assume it exists or we handle it.
        console.error('Error loading staff:', error.message);
        staff.value = [];
     } else {
        staff.value = data || [];
     }
+
+    // Fetch all active groups to allow assignment for teachers
+    const { data: groupsData, error: groupsError } = await supabase
+      .from('groups')
+      .select('id, name')
+      .neq('status', 'Finished');
+    if (!groupsError) allGroups.value = groupsData || [];
   } catch (e) {
     console.error('Catch error loading staff:', e.message);
     staff.value = [];
@@ -153,8 +161,20 @@ const staffForm = reactive({
   phone: '',
   email: '',
   role: 'regular',
-  password: ''
+  password: '',
+  teacher_subject: '',
+  teacher_schedule: '',
+  groupIds: []
 });
+
+const toggleGroupSelection = (groupId) => {
+  const index = staffForm.groupIds.indexOf(groupId);
+  if (index === -1) {
+    staffForm.groupIds.push(groupId);
+  } else {
+    staffForm.groupIds.splice(index, 1);
+  }
+};
 
 const openAddModal = () => {
   isEditing.value = false;
@@ -164,6 +184,9 @@ const openAddModal = () => {
   staffForm.email = '';
   staffForm.role = 'regular';
   staffForm.password = '';
+  staffForm.teacher_subject = '';
+  staffForm.teacher_schedule = '';
+  staffForm.groupIds = [];
   showModal.value = true;
 };
 
@@ -175,7 +198,22 @@ const openEditModal = (person) => {
   staffForm.email = person.email;
   staffForm.role = person.role || 'regular';
   staffForm.password = person.password || '';
+  staffForm.teacher_subject = person.teacher_subject || '';
+  staffForm.teacher_schedule = person.teacher_schedule || '';
+  // Fetch groups where this staff is assigned
+  staffForm.groupIds = [];
+  fetchGroupsForStaff(person.id);
   showModal.value = true;
+};
+
+const fetchGroupsForStaff = async (staffId) => {
+  const { data, error } = await supabase
+    .from('groups')
+    .select('id')
+    .eq('teacher_id', staffId);
+  if (!error && data) {
+    staffForm.groupIds = data.map(g => g.id);
+  }
 };
 
 const closeModal = () => {
@@ -195,7 +233,13 @@ const submitForm = async () => {
     updated_at: new Date().toISOString()
   };
 
+  if (staffForm.role === 'teacher') {
+    dbStaff.teacher_subject = staffForm.teacher_subject;
+    dbStaff.teacher_schedule = staffForm.teacher_schedule;
+  }
+
   try {
+    let currentStaffId = editingId.value;
     if (isEditing.value) {
       const { error } = await supabase
         .from('staff')
@@ -204,10 +248,22 @@ const submitForm = async () => {
       if (error) throw error;
     } else {
       dbStaff.created_at = new Date().toISOString();
-      const { error } = await supabase
+      const { data: newStaffData, error } = await supabase
         .from('staff')
-        .insert([dbStaff]);
+        .insert([dbStaff])
+        .select()
+        .single();
       if (error) throw error;
+      currentStaffId = newStaffData.id;
+    }
+
+    if (staffForm.role === 'teacher' && currentStaffId) {
+      // 1. Remove this staff from any groups they were previously assigned to
+      await supabase.from('groups').update({ teacher_id: null }).eq('teacher_id', currentStaffId);
+      // 2. Assign this staff to the newly selected groups
+      if (staffForm.groupIds && staffForm.groupIds.length > 0) {
+        await supabase.from('groups').update({ teacher_id: currentStaffId }).in('id', staffForm.groupIds);
+      }
     }
     await loadData();
     closeModal();
@@ -372,38 +428,76 @@ const submitForm = async () => {
             </div>
             <button class="btn-icon" @click="closeModal"><X :size="20" /></button>
           </div>
-
           <div class="modal-body">
             <div class="form-group">
               <label>{{ $t('staff.name') || 'Name' }} <span class="required">*</span></label>
-              <input v-model="staffForm.name" :placeholder="$t('staff.namePlaceholder') || 'Enter full name'" />
+              <input v-model="staffForm.name" :placeholder="$t('teachers.namePlaceholder') || 'например, Иван Петров'" />
             </div>
-            
             <div class="form-row">
               <div class="form-group">
                 <label>{{ $t('staff.role') || 'Role' }} <span class="required">*</span></label>
                 <select v-model="staffForm.role">
-                  <option value="regular">{{ $t('roles.regular') || 'Staff' }}</option>
-                  <option value="admin">{{ $t('roles.admin') || 'Admin' }}</option>
+                  <option value="regular">{{ $t('roles.regular') }}</option>
+                  <option value="admin">{{ $t('roles.admin') }}</option>
+                  <option value="teacher">{{ $t('roles.teacher') }}</option>
                 </select>
               </div>
+              <div class="form-group" v-if="staffForm.role === 'teacher'">
+                <label>{{ $t('teachers.subject') || 'Предмет / Кафедра' }} <span class="required">*</span></label>
+                <input v-model="staffForm.teacher_subject" :placeholder="$t('teachers.subjectPlaceholder') || 'например, Английский, Математика'" />
+              </div>
+            </div>
+
+            <div class="form-row">
               <div class="form-group">
-                <label>{{ $t('staff.phone') || 'Phone' }}</label>
+                <label>{{ $t('staff.phone') || 'Номер телефона' }}</label>
                 <input v-model="staffForm.phone" placeholder="+998 90 000 0000" />
               </div>
-            </div>
-
-            <div class="form-group">
-              <label>{{ $t('staff.email') || 'Email' }}</label>
-              <input v-model="staffForm.email" :placeholder="$t('staff.emailPlaceholder') || 'example@mail.com'" />
-            </div>
-
-            <div class="form-group">
-              <label>{{ $t('common.password') }} <span class="required">*</span></label>
-              <div class="input-with-icon">
-                <Lock :size="18" class="input-icon" />
-                <input v-model="staffForm.password" type="password" :placeholder="$t('common.passwordPlaceholder')" />
+              <div class="form-group">
+                <label>{{ $t('common.password') }} <span class="required">*</span></label>
+                <div class="input-with-icon">
+                  <Lock :size="18" class="input-icon" />
+                  <input v-model="staffForm.password" type="password" :placeholder="$t('common.passwordPlaceholder')" />
+                </div>
               </div>
+            </div>
+
+            <div class="form-group">
+              <label>{{ $t('staff.email') || 'Электронная почта' }}</label>
+              <input v-model="staffForm.email" :placeholder="$t('teachers.emailPlaceholder') || 'uchitel@example.com'" />
+            </div>
+
+            <div class="form-group" v-if="staffForm.role === 'teacher'">
+              <label>{{ $t('staff.teacherSchedule') || 'График работы' }}</label>
+              <textarea v-model="staffForm.teacher_schedule" :placeholder="$t('staff.teacherSchedulePlaceholder')" class="form-textarea"></textarea>
+            </div>
+
+            <!-- Group Assignment Section for Teachers -->
+            <div class="form-group" v-if="staffForm.role === 'teacher'" style="grid-column: 1 / -1; margin-top: 1rem;">
+              <label style="font-size: 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                <Users :size="18" /> Assign Groups
+              </label>
+              <div class="groups-checkbox-grid">
+                <label 
+                  v-for="group in allGroups" 
+                  :key="group.id" 
+                  class="checkbox-card"
+                  :class="{ active: staffForm.groupIds.includes(group.id) }"
+                >
+                  <input 
+                    type="checkbox" 
+                    :value="group.id"
+                    :checked="staffForm.groupIds.includes(group.id)"
+                    @change="toggleGroupSelection(group.id)"
+                    class="hidden-radio"
+                  />
+                  <span class="group-select-name">{{ group.name }}</span>
+                  <div class="checkbox-indicator">
+                    <Check v-if="staffForm.groupIds.includes(group.id)" :size="14" />
+                  </div>
+                </label>
+              </div>
+              <p v-if="allGroups.length === 0" class="text-muted" style="margin-top: 0.5rem; font-size: 0.85rem;">No active groups available to assign.</p>
             </div>
           </div>
 
@@ -469,7 +563,34 @@ td { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
 
 .role-tag { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
 .role-tag.admin { background: rgba(115, 102, 255, 0.1); color: var(--primary); }
+.role-tag.teacher { background: rgba(40, 199, 111, 0.1); color: var(--success); }
 .role-tag.regular { background: rgba(0, 207, 232, 0.1); color: var(--info); }
+
+.form-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--light);
+  outline: none;
+  transition: all 0.2s;
+  min-height: 80px;
+  font-family: inherit;
+}
+.form-textarea:focus {
+  border-color: var(--primary);
+  background: white;
+  box-shadow: 0 0 0 4px var(--primary-light);
+}
+
+.teacher-fields-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+}
 
 .date-info { display: flex; align-items: center; gap: 0.4rem; color: var(--gray); font-size: 0.85rem; }
 
@@ -484,11 +605,11 @@ td { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
 .dropdown-divider { height: 1px; background: rgba(0, 0, 0, 0.05); margin: 0.4rem 0.5rem; }
 
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 10000; backdrop-filter: blur(4px); }
-.modal-box { background: white; border-radius: 20px; width: 100%; max-width: 600px; overflow: hidden; }
+.modal-box { background: white; border-radius: 20px; width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
 .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
 .modal-title-row { display: flex; align-items: center; gap: 1rem; }
 .modal-icon { width: 42px; height: 42px; background: var(--primary-light); color: var(--primary); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-.modal-body { padding: 1.5rem; }
+.modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
 .form-group { margin-bottom: 1.25rem; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
 label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; }
@@ -525,4 +646,13 @@ input:focus, select:focus { border-color: var(--primary); background: white; box
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; }
 @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.groups-checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; max-height: 250px; overflow-y: auto; padding: 0.25rem; }
+.checkbox-card { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: var(--light); user-select: none; }
+.checkbox-card:hover { border-color: var(--primary-light); }
+.checkbox-card.active { border-color: var(--primary); background: #fdfcff; }
+.hidden-radio { display: none; }
+.group-select-name { font-size: 0.9rem; font-weight: 600; color: var(--dark); }
+.checkbox-indicator { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; background: white; color: white; transition: all 0.2s; }
+.checkbox-card.active .checkbox-indicator { background: var(--primary); border-color: var(--primary); }
 </style>

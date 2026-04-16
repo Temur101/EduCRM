@@ -15,13 +15,19 @@ import {
   Wallet,
   FileText,
   Trash2,
-  Loader2
+  Loader2,
+  Printer,
+  FileDown
 } from 'lucide-vue-next';
 import { ref, reactive, computed, onMounted } from 'vue';
+import { jsPDF } from 'jspdf';
 import { supabase } from '../supabase.js';
 import PaymentModal from '../components/PaymentModal.vue';
 
+const userRole = ref(localStorage.getItem('userRole') || 'regular');
 const showModal = ref(false);
+const showDetailsModal = ref(false);
+const selectedPayment = ref(null);
 
 // --- Sample Data ---
 const payments = ref([]);
@@ -157,6 +163,99 @@ const closeModal = () => {
 
 const onPaymentSuccess = () => {
   loadData();
+};
+
+const openDetailsModal = (payment) => {
+  selectedPayment.value = payment;
+  showDetailsModal.value = true;
+};
+
+const closeDetailsModal = () => {
+  showDetailsModal.value = false;
+  selectedPayment.value = null;
+};
+
+const generatePDF = (payment) => {
+  const doc = new jsPDF();
+  
+  // Set font
+  doc.setFont('helvetica');
+
+  // Header
+  doc.setFillColor(115, 102, 255); // Primary color
+  doc.rect(0, 0, 210, 40, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(24);
+  doc.text('PAYMENT RECEIPT', 105, 25, { align: 'center' });
+  
+  // Reset text color
+  doc.setTextColor(30, 41, 59); // Dark color
+  
+  // Receipt Info Background
+  doc.setFillColor(248, 250, 252);
+  doc.rect(140, 50, 55, 30, 'F');
+  
+  doc.setFontSize(10);
+  doc.text('Receipt ID', 145, 58);
+  doc.setFontSize(12);
+  doc.text(String(payment.receiptId), 145, 65);
+  
+  doc.setFontSize(10);
+  doc.text('Date', 145, 73);
+  doc.setFontSize(11);
+  // Numeric date format to avoid Cyrillic Month encoding issues
+  const numericDate = new Date(payment.date).toLocaleDateString('ru-RU');
+  doc.text(numericDate, 145, 78);
+
+  // Content
+  doc.setFontSize(14);
+  doc.text('STUDENT INFORMATION', 20, 60);
+  doc.line(20, 63, 80, 63);
+  
+  doc.setFontSize(11);
+  doc.text(`Full Name:`, 20, 75);
+  doc.text(payment.student || '', 50, 75);
+  
+  doc.text(`Course:`, 20, 85);
+  doc.text(payment.course || '', 50, 85);
+
+  doc.setFontSize(14);
+  doc.text('PAYMENT DETAILS', 20, 105);
+  doc.line(20, 108, 70, 108);
+
+  doc.text(`Billing Month:`, 20, 120);
+  doc.text(payment.month || '-', 60, 120);
+  
+  doc.text(`Payment Method:`, 20, 130);
+  doc.text(payment.method || '', 60, 130);
+  
+  doc.text(`Status:`, 20, 140);
+  doc.text(payment.status || '', 60, 140);
+  
+  if (payment.comment) {
+    doc.text(`Notes:`, 20, 150);
+    const splitComment = doc.splitTextToSize(payment.comment, 130);
+    doc.text(splitComment, 60, 150);
+  }
+
+  // Footer / Total
+  doc.setFillColor(248, 250, 252);
+  doc.rect(20, 180, 170, 30, 'F');
+  
+  doc.setFontSize(16);
+  doc.text('TOTAL PAID:', 30, 200);
+  doc.setFontSize(20);
+  // Numeric amount formatting
+  const amountStr = Number(payment.amount).toLocaleString('ru-RU') + " UZS";
+  doc.text(amountStr, 180, 200, { align: 'right' });
+
+  // Thank you note
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Thank you for choosing EduCRM!', 105, 230, { align: 'center' });
+  
+  doc.save(`Receipt_${payment.receiptId}.pdf`);
 };
 
 
@@ -360,7 +459,6 @@ const getMethodIcon = (method) => {
               <X :size="14" />
             </button>
           </div>
-          <button class="btn-outline" @click="handleExport"><Download :size="16" /> {{ $t('common.export') }}</button>
         </div>
       </div>
 
@@ -430,7 +528,11 @@ const getMethodIcon = (method) => {
                 </span>
               </td>
               <td>
-                <div class="dropdown-wrapper">
+                <div class="row-actions">
+                  <button class="btn-icon export-btn" @click="openDetailsModal(item)" :title="$t('common.export')">
+                    <Download :size="18" />
+                  </button>
+                  <div class="dropdown-wrapper" v-if="userRole === 'admin'">
                   <button class="btn-icon" @click="(e) => toggleDropdown('pay-' + item.id, e)">
                     <MoreVertical :size="18" />
                   </button>
@@ -440,6 +542,7 @@ const getMethodIcon = (method) => {
                       <Trash2 v-else :size="16" /> 
                       {{ deletingPaymentId === item.id ? $t('common.loading') : $t('leads.delete') }}
                     </button>
+                  </div>
                   </div>
                 </div>
               </td>
@@ -486,6 +589,78 @@ const getMethodIcon = (method) => {
       @close="closeModal"
       @success="onPaymentSuccess"
     />
+
+    <!-- Payment Details Modal -->
+    <transition name="modal">
+      <div v-if="showDetailsModal && selectedPayment" class="modal-overlay" @click.self="closeDetailsModal">
+        <div class="modal-box details-modal">
+          <div class="modal-header">
+            <div class="header-title">
+              <div class="modal-icon"><FileText :size="22" /></div>
+              <h2>{{ $t('payments.details') || 'Payment Details' }}</h2>
+            </div>
+            <button class="btn-icon" @click="closeDetailsModal"><X :size="20" /></button>
+          </div>
+
+          <div class="modal-body p-0">
+            <div class="receipt-preview">
+              <div class="receipt-header">
+                <div class="company-logo">EduCRM</div>
+                <div class="receipt-id-tag">
+                  <span>{{ $t('payments.receiptColumn') }}</span>
+                  <strong>{{ selectedPayment.receiptId }}</strong>
+                </div>
+              </div>
+              
+              <div class="receipt-grid">
+                <div class="grid-item">
+                  <label>{{ $t('payments.studentColumn') }}</label>
+                  <span>{{ selectedPayment.student }}</span>
+                </div>
+                <div class="grid-item">
+                  <label>{{ $t('students.course') }}</label>
+                  <span>{{ selectedPayment.course }}</span>
+                </div>
+                <div class="grid-item">
+                  <label>{{ $t('payments.dateColumn') }}</label>
+                  <span>{{ formatDate(selectedPayment.date) }}</span>
+                </div>
+                <div class="grid-item">
+                  <label>{{ $t('payments.methodColumn') }}</label>
+                  <span>{{ selectedPayment.method }}</span>
+                </div>
+                <div class="grid-item">
+                  <label>{{ $t('payments.monthColumn') }}</label>
+                  <span>{{ selectedPayment.month || '-' }}</span>
+                </div>
+                <div class="grid-item">
+                  <label>{{ $t('payments.statusColumn') }}</label>
+                  <span :class="getStatusClass(selectedPayment.status)">{{ selectedPayment.status }}</span>
+                </div>
+              </div>
+
+              <div class="receipt-comment" v-if="selectedPayment.comment">
+                <label>{{ $t('payments.commentColumn') }}</label>
+                <p>{{ selectedPayment.comment }}</p>
+              </div>
+
+              <div class="receipt-total">
+                <span>{{ $t('payments.amountColumn') }}</span>
+                <h2>{{ formatCurrency(selectedPayment.amount) }}</h2>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn-secondary" @click="closeDetailsModal">{{ $t('common.cancel') }}</button>
+            <button class="btn-primary" @click="generatePDF(selectedPayment)">
+              <FileDown :size="18" />
+              {{ $t('common.downloadPDF') || 'Download PDF' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -706,7 +881,7 @@ const getMethodIcon = (method) => {
 }
 
 .table-scroll-wrapper {
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: visible;
 }
 
@@ -735,9 +910,9 @@ table {
 
 th {
   text-align: left;
-  padding: 1.25rem 1.5rem;
+  padding: 1.1rem 1rem;
   background: #F8F9FA;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--gray);
   text-transform: uppercase;
@@ -745,7 +920,7 @@ th {
 }
 
 td {
-  padding: 1.1rem 1.5rem;
+  padding: 0.9rem 1rem;
   border-bottom: 1px solid #F1F5F9;
   vertical-align: middle;
 }
@@ -813,7 +988,7 @@ td {
 .status-pending { background: rgba(255,159,67,0.1); color: var(--warning); }
 
 .table-month-cell {
-  min-width: 120px;
+  min-width: 100px;
 }
 
 .month-label {
@@ -830,7 +1005,7 @@ td {
 }
 
 .table-comment-cell {
-  max-width: 180px;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1073,6 +1248,162 @@ td {
   white-space: nowrap;
   font-weight: 500;
   color: var(--gray);
-  min-width: 90px;
+  min-width: 80px;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.export-btn {
+  color: var(--primary) !important;
+  background: var(--primary-light) !important;
+  border-radius: 8px !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+  border: none !important;
+  cursor: pointer !important;
+}
+
+.export-btn:hover {
+  background: var(--primary) !important;
+  color: white !important;
+}
+
+/* Details Modal Styles */
+.details-modal {
+  max-width: 500px !important;
+}
+
+.p-0 { padding: 0 !important; }
+
+.receipt-preview {
+  padding: 2.5rem;
+  background: white;
+}
+
+.receipt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2.5rem;
+}
+
+.company-logo {
+  font-size: 1.75rem;
+  font-weight: 900;
+  color: var(--primary);
+  letter-spacing: -0.5px;
+}
+
+.receipt-id-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.receipt-id-tag span {
+  font-size: 0.7rem;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
+.receipt-id-tag strong {
+  font-size: 1.25rem;
+  color: var(--dark);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.receipt-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+}
+
+.grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.grid-item label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.grid-item span {
+  font-weight: 600;
+  color: var(--dark);
+  font-size: 1rem;
+}
+
+.status-success { color: var(--success) !important; }
+.status-pending { color: var(--warning) !important; }
+
+.receipt-comment {
+  margin-bottom: 2.5rem;
+  padding: 1.25rem;
+  background: #F8FAFC;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+.receipt-comment label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--gray);
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.receipt-comment p {
+  font-size: 0.95rem;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.receipt-total {
+  border-top: 2px dashed var(--border);
+  padding-top: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.receipt-total span {
+  font-weight: 800;
+  color: var(--gray);
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.receipt-total h2 {
+  color: var(--primary);
+  font-weight: 900;
+  font-size: 1.75rem;
+}
+
+.btn-secondary {
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 700;
+  color: var(--gray);
+  background: var(--light);
+  border: none;
+  cursor: pointer;
 }
 </style>

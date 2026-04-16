@@ -424,7 +424,7 @@ const formatDate = (dateStr) => {
                       <button class="btn-view-action" @click="goToStudentDetail(item.id)">
                         <Eye :size="20" />
                       </button>
-                      <button v-if="userRole === 'admin'" class="btn-view-action payment-btn" @click="openPaymentModal(item)">
+                      <button v-if="userRole === 'admin' || userRole === 'regular'" class="btn-view-action payment-btn" @click="openPaymentModal(item)">
                         <CreditCard :size="20" />
                       </button>
                       <div class="dropdown-wrapper" v-if="userRole === 'admin'">

@@ -148,6 +148,8 @@ const today = new Date();
 const attYear  = ref(today.getFullYear());
 const attMonth = ref(today.getMonth());
 const attLoading = ref(false);
+const currentPageAtt = ref(1);
+const pageSizeAtt = 5;
 
 // attendanceMap: { 'YYYY-MM-DD': status }
 const attMap = ref({});
@@ -170,15 +172,10 @@ const loadAttendance = async () => {
   try {
     const y = attYear.value;
     const m = attMonth.value;
-    const start = `${y}-${String(m+1).padStart(2,'0')}-01`;
-    const end   = `${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
-    
     const { data, error } = await supabase
       .from('attendance')
       .select('lesson_date, status')
-      .eq('student_id', studentId)
-      .gte('lesson_date', start)
-      .lte('lesson_date', end);
+      .eq('student_id', studentId);
       
     if (error) { 
       console.warn('Attendance fetch warning:', error.message); 
@@ -219,17 +216,33 @@ const dateKey = (d) => {
 
 const attStats = computed(() => {
   const s = { present: 0, absent: 0, sick: 0, late: 0, total: 0 };
-  Object.values(attMap.value).forEach(st => {
-    if (s[st] !== undefined) { s[st]++; s.total++; }
+  const targetYear = attYear.value;
+  const targetMonth = attMonth.value + 1; // JS month is 0-indexed, DB/attMap key is 1-indexed (usually)
+  
+  Object.entries(attMap.value).forEach(([date, st]) => {
+    const [y, m] = date.split('-').map(Number);
+    if (y === targetYear && m === targetMonth) {
+      if (s[st] !== undefined) { s[st]++; s.total++; }
+    }
   });
   return s;
 });
 
-const recentRecords = computed(() => {
+const allRecentRecords = computed(() => {
   return Object.entries(attMap.value)
     .sort((a,b) => b[0].localeCompare(a[0]))
-    .slice(0, 8)
     .map(([date, status]) => ({ date, status }));
+});
+
+const paginatedAttendance = computed(() => {
+  const start = (currentPageAtt.value - 1) * pageSizeAtt;
+  return allRecentRecords.value.slice(start, start + pageSizeAtt);
+});
+
+const totalPagesAtt = computed(() => Math.ceil(allRecentRecords.value.length / pageSizeAtt));
+
+watch([attMonth, attYear], () => {
+  currentPageAtt.value = 1;
 });
 
 const getStatusMeta = (key) => STATUSES.find(s => s.key === key) || null;
@@ -690,7 +703,7 @@ const onPaymentSuccess = () => {
             </div>
 
             <!-- Discount editor -->
-            <div class="discount-editor" v-if="userRole === 'admin'">
+            <div class="discount-editor" v-if="userRole === 'admin' || userRole === 'regular'">
               <div class="discount-label">
                 <span>Chegirma berish</span>
                 <span class="discount-hint">UZS summasi</span>
@@ -758,8 +771,8 @@ const onPaymentSuccess = () => {
                 v-for="item in billingSummary" 
                 :key="item.monthStr" 
                 class="billing-month-card" 
-                :class="[item.status, { 'clickable': userRole === 'admin' }]"
-                @click="userRole === 'admin' && openPaymentForMonth(item)"
+                :class="[item.status, { 'clickable': userRole === 'admin' || userRole === 'regular' }]"
+                @click="(userRole === 'admin' || userRole === 'regular') && openPaymentForMonth(item)"
               >
                 <div class="month-main">
                   <div class="month-name-wrap">
@@ -797,7 +810,7 @@ const onPaymentSuccess = () => {
           </div>
 
           <!-- Payment Button -->
-          <div v-if="userRole === 'admin'" class="payment-action-wrapper" style="margin-top: 1.5rem;">
+          <div v-if="userRole === 'admin' || userRole === 'regular'" class="payment-action-wrapper" style="margin-top: 1.5rem;">
             <button class="btn-primary" style="width: 100%; justify-content: center; padding: 1rem; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px;" @click="openPaymentModal">
               <CreditCard :size="18" />
               {{ $t('students.payNow') }}
@@ -961,13 +974,34 @@ const onPaymentSuccess = () => {
               </div>
 
               <!-- Recent records list -->
-              <div v-if="recentRecords.length > 0" class="att-records">
-                <div class="att-records-title">So'nggi yozuvlar</div>
-                <div class="att-record" v-for="r in recentRecords" :key="r.date">
-                  <div class="att-record-date">{{ r.date }}</div>
-                  <div class="att-record-badge"
-                    :style="{ background: getStatusMeta(r.status)?.bg, color: getStatusMeta(r.status)?.color }">
-                    {{ getStatusMeta(r.status)?.short }} {{ getStatusMeta(r.status)?.label }}
+              <div v-if="allRecentRecords.length > 0" class="att-records">
+                <div class="att-records-header">
+                  <div class="att-records-title">So'nggi yozuvlar</div>
+                  <div v-if="totalPagesAtt > 1" class="att-mini-pagination">
+                    <button 
+                      class="att-p-btn" 
+                      :disabled="currentPageAtt === 1" 
+                      @click="currentPageAtt--"
+                    >
+                      <ChevronLeft :size="14" />
+                    </button>
+                    <span class="att-p-info">{{ currentPageAtt }} / {{ totalPagesAtt }}</span>
+                    <button 
+                      class="att-p-btn" 
+                      :disabled="currentPageAtt === totalPagesAtt" 
+                      @click="currentPageAtt++"
+                    >
+                      <ChevronRight :size="14" />
+                    </button>
+                  </div>
+                </div>
+                <div class="att-record-list">
+                  <div class="att-record" v-for="r in paginatedAttendance" :key="r.date">
+                    <div class="att-record-date">{{ r.date }}</div>
+                    <div class="att-record-badge"
+                      :style="{ background: getStatusMeta(r.status)?.bg, color: getStatusMeta(r.status)?.color }">
+                      {{ getStatusMeta(r.status)?.short }} {{ getStatusMeta(r.status)?.label }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2112,23 +2146,76 @@ td {
 }
 
 /* Records list */
-.att-records { border-top: 1px solid #F1F5F9; padding-top: 1rem; }
+.att-records { border-top: 1px solid #F1F5F9; padding-top: 1.25rem; }
+.att-records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
 .att-records-title {
-  font-size: .72rem;
+  font-size: .75rem;
   font-weight: 800;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: .5px;
-  margin-bottom: .75rem;
+}
+.att-mini-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+.att-p-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: white;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.att-p-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: white;
+}
+.att-p-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent;
+  box-shadow: none;
+}
+.att-p-info {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #475569;
+  min-width: 35px;
+  text-align: center;
+}
+.att-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 .att-record {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: .45rem 0;
-  border-bottom: 1px solid #F8FAFC;
+  padding: .6rem .75rem;
+  border-radius: 10px;
+  transition: background 0.2s;
 }
-.att-record-date { font-size: .83rem; font-weight: 600; color: #475569; }
+.att-record:hover {
+  background: #f8fafc;
+}
+.att-record-date { font-size: .88rem; font-weight: 600; color: #1e293b; }
 /* Billing Summary Section */
 .billing-summary-section { margin-top: 1.5rem; }
 .summary-count {
