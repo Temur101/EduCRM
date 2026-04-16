@@ -478,3 +478,243 @@ h1, h2, h3, h4 {
 @media (max-width: 1023px) {
   .tablet-hidden { display: none !important; }
 }
+
+/* ==========================================================
+   ROUND 2 — Фиксы по feedback пользователя
+   ========================================================== */
+
+/* ======== Фильтры-табы с горизонтальным скроллом (Archive, Tasks, Leads) ======== */
+@media (max-width: 767px) {
+  /* Контейнер filter-bar на Tasks/Leads: табы слева, кнопка справа */
+  .tasks-filters,
+  .leads-filters {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    align-items: stretch !important;
+    padding: 0.75rem !important;
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 1rem;
+  }
+
+  /* Archive: поиск + табы типов */
+  .archive-filters {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    align-items: stretch !important;
+  }
+
+  /* Горизонтальный скролл для набора табов */
+  .priority-tabs,
+  .type-tabs,
+  .stage-tabs {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.5rem !important;
+    padding: 0.25rem 0 0.5rem 0 !important;
+    margin: 0 !important;
+    scroll-snap-type: x mandatory;
+    /* мягкая тень по краям — даёт понять что есть скролл */
+    mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+  }
+  .priority-tabs::-webkit-scrollbar,
+  .type-tabs::-webkit-scrollbar,
+  .stage-tabs::-webkit-scrollbar { display: none; }
+
+  .priority-tabs .label,
+  .type-tabs .label {
+    flex-shrink: 0 !important;
+    align-self: center !important;
+    font-weight: 700;
+    font-size: 0.85rem !important;
+    padding-right: 0.25rem !important;
+  }
+
+  .priority-tabs .tab,
+  .type-tabs .tab,
+  .stage-tabs .tab {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    scroll-snap-align: start;
+  }
+
+  /* Кнопка "Add Board" / действие становится на всю ширину, ниже фильтров */
+  .filter-actions {
+    width: 100% !important;
+    display: flex !important;
+  }
+  .filter-actions > * {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  .btn-add-board {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 0.75rem 1rem !important;
+  }
+
+  /* Search bar в Archive — на всю ширину */
+  .archive-filters .search-bar {
+    width: 100% !important;
+  }
+}
+
+/* ======== ТАБЛИЦА ПОСЕЩАЕМОСТИ — мобильная оптимизация ======== */
+/* НЕ трансформировать её в карточки — оставить как таблицу со sticky name */
+@media (max-width: 767px) {
+  /* Отменяем card-layout для att-table (на случай если обёрнута в table-wrapper) */
+  .att-table thead { display: table-header-group !important; }
+  .att-table tr {
+    display: table-row !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .att-table td,
+  .att-table th {
+    display: table-cell !important;
+    padding: 0.35rem 0.2rem !important;
+    text-align: center !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+  .att-table td:before,
+  .att-table th:before { content: none !important; }
+
+  /* Компактные размеры ячеек */
+  .att-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .att-table { min-width: auto !important; }
+
+  .att-table .th-name,
+  .att-table .td-name {
+    min-width: 130px !important;
+    max-width: 130px !important;
+    padding: 0.5rem 0.5rem !important;
+    font-size: 0.72rem !important;
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 10;
+  }
+  .att-table .td-sname {
+    font-size: 0.78rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    max-width: 90px;
+  }
+  .att-table .td-num {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 0.65rem !important;
+  }
+  .att-table .th-day { min-width: 36px !important; padding: 0.35rem 0.15rem !important; }
+  .att-table .th-date { font-size: 0.78rem !important; }
+  .att-table .th-dow  { font-size: 0.55rem !important; }
+  .att-table .th-sum { min-width: 28px !important; padding: 0.4rem 0.2rem !important; font-size: 0.7rem !important; }
+
+  /* Ячейки дней — само содержимое */
+  .att-table .td-cell { padding: 0.3rem 0.2rem !important; min-width: 36px !important; }
+  .att-table .att-status-btn,
+  .att-table .status-dot,
+  .att-table .status-cell {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Шапка блока: стек */
+  .att-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+  }
+  .att-header .month-nav {
+    align-self: center !important;
+    width: auto !important;
+  }
+  .att-header .legend {
+    flex-wrap: wrap !important;
+    gap: 0.3rem !important;
+    justify-content: flex-start !important;
+  }
+  .att-header .legend-item {
+    font-size: 0.7rem !important;
+    padding: 0.2rem 0.5rem !important;
+  }
+}
+
+/* ======== StudentDetails .att-calendar — сетка календаря ======== */
+@media (max-width: 767px) {
+  .att-calendar {
+    gap: 2px !important;
+  }
+  .att-calendar .day-cell,
+  .att-calendar .att-day {
+    font-size: 0.75rem !important;
+    min-height: 34px !important;
+  }
+}
+
+/* ======== PLANSHET — Sidebar: увеличенные иконки и логотип ======== */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Увеличиваем контейнер иконок */
+  .sidebar .nav-item {
+    padding: 0.9rem 0 !important;
+    justify-content: center !important;
+  }
+  /* Увеличиваем SVG иконки (lucide) */
+  .sidebar .nav-item .icon,
+  .sidebar .nav-item svg {
+    width: 26px !important;
+    height: 26px !important;
+    margin: 0 !important;
+    stroke-width: 2;
+  }
+  /* Логотип побольше */
+  .sidebar .sidebar-header {
+    padding: 1.25rem 0 !important;
+    height: 90px !important;
+  }
+  .sidebar .main-logo {
+    height: 56px !important;
+    max-width: 64px !important;
+  }
+  /* Аватар пользователя */
+  .sidebar .user-avatar-placeholder {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 1.1rem !important;
+  }
+  .sidebar .sidebar-footer {
+    padding: 1rem 0.5rem !important;
+  }
+}
+
+/* ======== Kanban на мобилке — лучше видно ======== */
+@media (max-width: 767px) {
+  .kanban-wrapper {
+    gap: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+  .kanban-column {
+    min-width: 85vw !important;
+    max-width: 85vw !important;
+    flex-shrink: 0 !important;
+  }
+  .add-column-placeholder {
+    min-height: 120px !important;
+  }
+}
