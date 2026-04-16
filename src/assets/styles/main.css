@@ -229,11 +229,8 @@ img, svg {
   }
 
   /* Dashboard Cards: 2 Columns */
-  .stats-grid, .groups-grid {
+  [class*="-grid"], .dashboard-content-grid {
     grid-template-columns: repeat(2, 1fr) !important;
-  }
-  .dashboard-grid {
-    grid-template-columns: 1fr !important;
   }
 }
 
@@ -272,11 +269,7 @@ img, svg {
   }
 
   /* Dashboard Cards: 1 Column */
-  .stats-grid, .groups-grid {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .dashboard-content-grid {
+  [class*="-grid"], .dashboard-content-grid {
     grid-template-columns: 1fr !important;
   }
 
@@ -359,13 +352,34 @@ img, svg {
     text-align: right;
     box-sizing: border-box;
   }
+  
+  /* Show only most important 3-4 fields + last child (Actions) */
+  td:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:last-child) {
+    display: none !important;
+  }
+
   td:last-child {
     border-bottom: none !important;
+    margin-top: 0.5rem;
+    padding-top: 1rem !important;
+    border-top: 1px solid var(--border);
+    justify-content: center !important;
   }
   
   /* Action columns (dropdowns, buttons) should be full width or at the bottom */
   td:has(.actions-wrapper), td:has(.dropdown-wrapper) {
     justify-content: flex-end !important;
+  }
+
+  /* Labels above inputs globally */
+  .form-group, .input-group {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    width: 100% !important;
+  }
+  .form-group label {
+    margin-bottom: 0.4rem !important;
   }
 }
 
