@@ -1,4 +1,4 @@
--- EduCRM Complete Database Schema
+-- EduCRM Complete Database Schema (Updated & Synchronized)
 -- Paste this entire file into your Supabase SQL Editor and run it to set up the database.
 
 -- 1. Enable UUID extension
@@ -34,9 +34,13 @@ CREATE TABLE IF NOT EXISTS teachers (
     name TEXT NOT NULL,
     subject TEXT,
     phone TEXT,
-    email TEXT,
-    percentage INTEGER,
+    email TEXT UNIQUE,
+    password TEXT DEFAULT 'teacher123',
+    percentage INTEGER DEFAULT 0,
     status TEXT DEFAULT 'Active',
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ DEFAULT now(),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -67,11 +71,14 @@ CREATE TABLE IF NOT EXISTS groups (
     name TEXT NOT NULL,
     course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
     teacher_id UUID REFERENCES teachers(id) ON DELETE SET NULL,
+    teacher_ids UUID[] DEFAULT '{}',
     room TEXT,
     days TEXT[],
     time TEXT,
     status TEXT DEFAULT 'Active',
     students_list UUID[] DEFAULT '{}',
+    is_deleted BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMPTZ DEFAULT now(),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -81,6 +88,7 @@ CREATE TABLE IF NOT EXISTS students (
     name TEXT NOT NULL,
     phone TEXT,
     phone2 TEXT,
+    email TEXT,
     balance BIGINT DEFAULT 0,
     discount BIGINT DEFAULT 0,
     groups UUID[] DEFAULT '{}',
@@ -148,7 +156,20 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 14. Create archives table
+-- 14. Create staff table
+CREATE TABLE IF NOT EXISTS staff (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    email TEXT UNIQUE,
+    phone TEXT,
+    password TEXT NOT NULL DEFAULT 'staff123',
+    role TEXT DEFAULT 'regular',
+    status TEXT DEFAULT 'Active',
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 15. Create archives table
 CREATE TABLE IF NOT EXISTS archives (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     type TEXT NOT NULL,
@@ -157,64 +178,18 @@ CREATE TABLE IF NOT EXISTS archives (
     archived_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 15. Create staff table
-CREATE TABLE IF NOT EXISTS staff (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL,
-    email TEXT,
-    phone TEXT,
-    role TEXT DEFAULT 'Staff',
-    status TEXT DEFAULT 'Active',
-    created_at TIMESTAMPTZ DEFAULT now()
-);
+-- 16. Initial Data
+INSERT INTO boards (title, color) VALUES ('Today task list', '#EA5455') ON CONFLICT DO NOTHING;
 
--- ==========================================
--- OPTIONAL: ENABLE ROW LEVEL SECURITY
--- By default, Supabase requires RLS for API requests. 
--- You can either disable RLS (for testing) or add public policies.
--- Below we enable RLS and allow all authenticated & anon users to read/write.
--- ==========================================
-
--- Disable RLS or create "Allow ALL" policies (uncomment to apply)
-
--- ALTER TABLE lead_stages ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON lead_stages FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON leads FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON teachers FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON courses FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON rooms FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON groups FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE students ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON students FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON attendance FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON payments FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE payment_reminders ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON payment_reminders FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE boards ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON boards FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON tasks FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE archives ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON archives FOR ALL USING (true) WITH CHECK (true);
-
--- ALTER TABLE staff ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all" ON staff FOR ALL USING (true) WITH CHECK (true);
+-- 17. Security Policy Setup
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOR t IN SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' 
+    LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
+        EXECUTE format('DROP POLICY IF EXISTS "Allow all" ON %I;', t);
+        EXECUTE format('CREATE POLICY "Allow all" ON %I FOR ALL USING (true) WITH CHECK (true);', t);
+    END LOOP;
+END $$;
